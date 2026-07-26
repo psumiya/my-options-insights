@@ -32,28 +32,10 @@
                         </svg>
                     </button>
                     
-                    <!-- Actions Menu -->
-                    <div class="relative">
-                        <button id="actions-menu-btn" class="icon-btn" aria-label="Actions menu" aria-expanded="false">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
-                            </svg>
-                        </button>
-                        <div id="actions-menu" class="actions-menu hidden">
-                            <button id="menu-demo-data-btn" class="menu-item">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-                                </svg>
-                                Load Demo Data
-                            </button>
-                            <button id="menu-upload-btn" class="menu-item">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                                </svg>
-                                Upload CSV
-                            </button>
-                        </div>
-                    </div>
+                    <!-- Always-visible actions -->
+                    <button id="header-upload-btn" class="btn-primary whitespace-nowrap">Upload CSV</button>
+                    <button id="header-demo-btn" class="btn-secondary whitespace-nowrap">Demo</button>
+                    <button id="header-clear-btn" class="btn-secondary whitespace-nowrap hidden">Clear</button>
                 </div>
             </div>
         </div>
@@ -71,18 +53,29 @@
             </div>
             
             <div class="mt-4 pt-4 border-t border-border text-left">
-                <p class="text-sm font-semibold mb-2">Supported Formats:</p>
-                <ul class="text-sm text-text-secondary space-y-1 mb-3">
-                    <li>✓ Robinhood CSV exports</li>
-                    <li>✓ tastytrade CSV exports</li>
-                    <li>✓ Generic CSV (Symbol, Entry, Credit/Debit)</li>
-                </ul>
-                <a href="https://github.com/psumiya/option-insights/blob/main/docs/BROKER_SUPPORT.md" 
-                   target="_blank" 
-                   rel="noopener noreferrer"
-                   class="text-sm text-accent hover:underline">
-                    View format details & download instructions →
-                </a>
+                <p class="text-sm font-semibold mb-3">Where to get your CSV:</p>
+                <div class="broker-guide">
+                    <p class="broker-name">Robinhood <span class="broker-where">(web)</span></p>
+                    <ol class="broker-steps">
+                        <li>Account → Reporting and statements → Reports</li>
+                        <li>Generate new report → Account activity</li>
+                        <li>Pick a date range, choose CSV, Download</li>
+                    </ol>
+                </div>
+                <div class="broker-guide">
+                    <p class="broker-name">tastytrade <span class="broker-where">(desktop or web)</span></p>
+                    <ol class="broker-steps">
+                        <li>History → Transactions</li>
+                        <li>Set the date range</li>
+                        <li>Click the CSV / download icon</li>
+                    </ol>
+                </div>
+                <p class="text-xs text-text-secondary mt-3">Generic CSVs (Symbol, Entry, Credit/Debit) also work.
+                    <a href="https://github.com/psumiya/option-insights/blob/main/docs/BROKER_SUPPORT.md"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="text-accent hover:underline">Format details →</a>
+                </p>
             </div>
             <button id="close-upload-btn" class="btn-secondary w-full mt-4">Cancel</button>
         </div>
@@ -103,26 +96,30 @@
     <main class="max-w-[1920px] mx-auto px-6 py-6">
         <!-- Empty State -->
         <div id="empty-state" class="bg-surface border border-border rounded-lg p-12 text-center">
-            <h2 class="text-xl font-semibold mb-2">No Trade Data Available</h2>
-            <p class="text-text-secondary mb-6">Upload a CSV file to get started with your trading analytics</p>
+            <h2 class="text-xl font-semibold mb-2">Analyze your options trades</h2>
+            <p class="text-text-secondary mb-6">Export a CSV from Robinhood or tastytrade, then upload it here. Everything stays in your browser.</p>
             <div class="flex gap-4 justify-center mb-8">
-                <button id="empty-state-demo-btn" class="btn-secondary">Load Demo Data</button>
                 <button id="empty-state-upload-btn" class="btn-primary">Upload CSV</button>
+                <button id="empty-state-demo-btn" class="btn-secondary">Try Demo Data</button>
             </div>
-            
-            <div class="max-w-md mx-auto pt-6 border-t border-border text-left">
-                <p class="text-sm font-semibold mb-2">Supported Formats:</p>
-                <ul class="text-sm text-text-secondary space-y-1 mb-3">
-                    <li>✓ Robinhood CSV exports</li>
-                    <li>✓ tastytrade CSV exports</li>
-                    <li>✓ Generic CSV (Symbol, Entry, Credit/Debit)</li>
-                </ul>
-                <a href="https://github.com/psumiya/option-insights/blob/main/docs/BROKER_SUPPORT.md" 
-                   target="_blank" 
-                   rel="noopener noreferrer"
-                   class="text-sm text-accent hover:underline">
-                    View format details & download instructions →
-                </a>
+
+            <div class="max-w-lg mx-auto pt-6 border-t border-border text-left grid sm:grid-cols-2 gap-6">
+                <div class="broker-guide">
+                    <p class="broker-name">Robinhood <span class="broker-where">(web)</span></p>
+                    <ol class="broker-steps">
+                        <li>Account → Reporting and statements → Reports</li>
+                        <li>Generate new report → Account activity</li>
+                        <li>Pick a date range, choose CSV, Download</li>
+                    </ol>
+                </div>
+                <div class="broker-guide">
+                    <p class="broker-name">tastytrade <span class="broker-where">(desktop or web)</span></p>
+                    <ol class="broker-steps">
+                        <li>History → Transactions</li>
+                        <li>Set the date range</li>
+                        <li>Click the CSV / download icon</li>
+                    </ol>
+                </div>
             </div>
         </div>
 

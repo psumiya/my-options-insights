@@ -51,7 +51,10 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Initialize dashboard (will load persisted data if available)
   dashboardController.initialize();
-  
+
+  // Reflect data presence in the header actions (show Clear if data loaded)
+  syncHeaderActions();
+
   // Load and apply persisted filters (Requirement 3.2)
   loadFilters();
 });
@@ -61,16 +64,17 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 function setupEventListeners() {
   // File upload button handlers
-  const uploadBtn = document.getElementById('upload-btn');
+  const headerUploadBtn = document.getElementById('header-upload-btn');
   const emptyStateUploadBtn = document.getElementById('empty-state-upload-btn');
   const uploadZone = document.getElementById('upload-zone');
   const closeUploadBtn = document.getElementById('close-upload-btn');
   const dropZone = document.getElementById('drop-zone');
   const fileInput = document.getElementById('file-input');
   const browseBtn = document.getElementById('browse-btn');
-  
-  // Demo data buttons
-  const demoDataBtn = document.getElementById('demo-data-btn');
+
+  // Demo + clear data buttons
+  const headerDemoBtn = document.getElementById('header-demo-btn');
+  const headerClearBtn = document.getElementById('header-clear-btn');
   const emptyStateDemoBtn = document.getElementById('empty-state-demo-btn');
   
   // Filter button groups
@@ -96,42 +100,39 @@ function setupEventListeners() {
   
   // Set up compact header on scroll
   setupCompactHeader();
-  
-  // Set up actions menu
-  setupActionsMenu();
-  
-  // Upload button click - show upload zone
-  if (uploadBtn && uploadZone) {
-    uploadBtn.addEventListener('click', (e) => {
+
+  // Upload buttons (header + empty state) - show upload zone
+  [headerUploadBtn, emptyStateUploadBtn].forEach(btn => {
+    if (btn && uploadZone) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        uploadZone.classList.remove('hidden');
+      });
+    }
+  });
+
+  // Demo data buttons (header + empty state)
+  [headerDemoBtn, emptyStateDemoBtn].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        handleDemoDataLoad();
+      });
+    }
+  });
+
+  // Clear data button (header)
+  if (headerClearBtn) {
+    headerClearBtn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      uploadZone.classList.remove('hidden');
-    });
-  }
-  
-  // Empty state upload button
-  if (emptyStateUploadBtn && uploadZone) {
-    emptyStateUploadBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      uploadZone.classList.remove('hidden');
-    });
-  }
-  
-  // Demo data button handlers
-  if (demoDataBtn) {
-    demoDataBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      handleDemoDataLoad();
-    });
-  }
-  
-  if (emptyStateDemoBtn) {
-    emptyStateDemoBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      handleDemoDataLoad();
+      if (confirm('Clear all imported trades from this browser? This cannot be undone.')) {
+        dashboardController.clearData();
+        dashboardController.showToast('Trade data cleared', 'success');
+        syncHeaderActions();
+      }
     });
   }
   
@@ -264,7 +265,10 @@ async function handleFileUpload(file) {
   
   // Enable compact header after data loads
   enableCompactHeader();
-  
+
+  // Reveal the Clear action now that data is loaded
+  syncHeaderActions();
+
   // Initialize filter summary
   updateFilterSummary();
 }
@@ -470,6 +474,9 @@ function handleDemoDataLoad() {
   
   // Enable compact header after data loads
   enableCompactHeader();
+
+  // Reveal the Clear action now that data is loaded
+  syncHeaderActions();
 }
 
 /**
@@ -544,47 +551,14 @@ function updateFilterSummary() {
 }
 
 /**
- * Set up actions menu toggle and handlers
+ * Show or hide the header "Clear" button based on whether trades are loaded.
+ * The dashboard is visible exactly when there is data to clear.
  */
-function setupActionsMenu() {
-  const menuBtn = document.getElementById('actions-menu-btn');
-  const menu = document.getElementById('actions-menu');
-  const menuDemoBtn = document.getElementById('menu-demo-data-btn');
-  const menuUploadBtn = document.getElementById('menu-upload-btn');
-  const uploadZone = document.getElementById('upload-zone');
-  
-  if (!menuBtn || !menu) return;
-  
-  // Toggle menu
-  menuBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const isExpanded = menuBtn.getAttribute('aria-expanded') === 'true';
-    menuBtn.setAttribute('aria-expanded', !isExpanded);
-    menu.classList.toggle('hidden');
-  });
-  
-  // Close menu when clicking outside
-  document.addEventListener('click', (e) => {
-    if (!menu.contains(e.target) && !menuBtn.contains(e.target)) {
-      menu.classList.add('hidden');
-      menuBtn.setAttribute('aria-expanded', 'false');
-    }
-  });
-  
-  // Menu item handlers
-  if (menuDemoBtn) {
-    menuDemoBtn.addEventListener('click', () => {
-      menu.classList.add('hidden');
-      menuBtn.setAttribute('aria-expanded', 'false');
-      handleDemoDataLoad();
-    });
-  }
-  
-  if (menuUploadBtn && uploadZone) {
-    menuUploadBtn.addEventListener('click', () => {
-      menu.classList.add('hidden');
-      menuBtn.setAttribute('aria-expanded', 'false');
-      uploadZone.classList.remove('hidden');
-    });
-  }
+function syncHeaderActions() {
+  const clearBtn = document.getElementById('header-clear-btn');
+  const dashboard = document.getElementById('dashboard');
+  if (!clearBtn || !dashboard) return;
+
+  const hasData = !dashboard.classList.contains('hidden');
+  clearBtn.classList.toggle('hidden', !hasData);
 }

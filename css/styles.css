@@ -1075,72 +1075,38 @@ input[type="file"] {
 }
 
 /* ============================================
-   Actions Menu Component
+   Broker Export Guide
    ============================================ */
-.actions-menu {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
-    min-width: 200px;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 50;
-    overflow: hidden;
+.broker-guide {
+    margin-bottom: 12px;
 }
 
-[data-theme="light"] .actions-menu {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+.broker-guide:last-child {
+    margin-bottom: 0;
 }
 
-.menu-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    padding: 12px 16px;
-    border: none;
-    background: transparent;
-    color: var(--color-text-primary);
+.broker-name {
     font-size: 14px;
-    text-align: left;
-    cursor: pointer;
-    transition: background 0.2s ease;
-    /* iOS Safari fixes */
-    -webkit-appearance: none;
-    appearance: none;
-    -webkit-tap-highlight-color: rgba(59, 130, 246, 0.3);
-    touch-action: manipulation;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-bottom: 4px;
 }
 
-.menu-item:hover {
-    background: rgba(59, 130, 246, 0.1);
-}
-
-.menu-item:active {
-    background: rgba(59, 130, 246, 0.15);
-}
-
-.menu-item svg {
-    flex-shrink: 0;
+.broker-where {
+    font-weight: 400;
     color: var(--color-text-secondary);
 }
 
-.menu-item:not(:last-child) {
-    border-bottom: 1px solid var(--color-border);
+.broker-steps {
+    list-style: decimal;
+    padding-left: 20px;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
 }
 
-/* Mobile responsive */
-@media (max-width: 767px) {
-    .actions-menu {
-        min-width: 180px;
-    }
-    
-    .menu-item {
-        padding: 10px 14px;
-        font-size: 13px;
-    }
+.broker-steps li {
+    margin-bottom: 2px;
 }
 
 /* ============================================
