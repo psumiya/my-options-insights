@@ -1,20 +1,27 @@
 #!/bin/bash
 # Deploy Option Insights to the shared sumiya.page site.
 #
-# The app is hosted as a subpath of sumiya.page (S3 bucket "algoclinic.com",
-# CloudFront distribution E35HO90YLKGBXV) rather than its own subdomain, to
-# avoid a dedicated Route 53 hosted zone / CloudFront distribution / bucket.
+# The app is hosted as a subpath of sumiya.page rather than its own subdomain,
+# to avoid a dedicated Route 53 hosted zone / CloudFront distribution / bucket.
 #
-# Live URL: https://sumiya.page/insights/index.html
+# Live URL: https://sumiya.page/${S3_PREFIX}/index.html
 #
-# Usage: ./deploy.sh
+# Usage:
+#   S3_BUCKET=<bucket> S3_PREFIX=<prefix> CF_DISTRIBUTION_ID=<id> ./deploy.sh
 
 set -e
 set -o pipefail
 
-BUCKET="${S3_BUCKET:-algoclinic.com}"
-PREFIX="${S3_PREFIX:-insights}"
-DISTRIBUTION_ID="${CF_DISTRIBUTION_ID:-E35HO90YLKGBXV}"
+for var in S3_BUCKET S3_PREFIX CF_DISTRIBUTION_ID; do
+  if [ -z "${!var+x}" ]; then
+    echo "Error: Environment variable '${var}' is not set." >&2
+    exit 1
+  fi
+done
+
+BUCKET="${S3_BUCKET}"
+PREFIX="${S3_PREFIX}"
+DISTRIBUTION_ID="${CF_DISTRIBUTION_ID}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
