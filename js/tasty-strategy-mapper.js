@@ -412,6 +412,18 @@ function aggregateStrategyLegs(legs) {
     }
   });
 
+  // Credit taken in when the position was opened. Distinct from totalCredit,
+  // which also picks up sell-to-close proceeds and so overstates what the
+  // structure was originally sold for.
+  let openCredit = 0;
+
+  openingLegs.forEach(leg => {
+    const amount = parseAmount(leg.Value || leg.Total || '0');
+    if (amount > 0) {
+      openCredit += amount;
+    }
+  });
+
   // Sum commissions and fees across all legs. TastyTrade reports both as
   // negative values (money leaving the account), so negate to store them as
   // positive cost magnitudes that callers subtract from gross P/L.
@@ -475,6 +487,7 @@ function aggregateStrategyLegs(legs) {
     Exit: exitDate,
     Debit: totalDebit,
     Credit: totalCredit,
+    OpenCredit: Math.round(openCredit * 100) / 100,
     Commissions: totalCommissions,
     Fees: totalFees,
     Width: width,

@@ -30,45 +30,45 @@
 
 ## Phase 2: Analysis module
 
-- [ ] 5. Create ResearchAnalytics with structure mapping and filtering
+- [x] 5. Create ResearchAnalytics with structure mapping and filtering
   - New `js/research-analytics.js` with canonical structure identifiers
   - `canonicalStructure()` mapping "Iron Condor", "Bull Put Spread", "Bear Call Spread" to identifiers, null otherwise
   - `applyFilter()` restricting to closed trades and applying underlying, DTE cut, and structure selection
   - Return excluded counts by reason alongside the filtered array
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 5.6, 14.1, 14.2_
 
-- [ ] 6. Port win/loss statistics and DTE bucketing
+- [x] 6. Port win/loss statistics and DTE bucketing
   - `winLossStats()`: count, win rate, average win, average loss, breakeven win rate, net, worst, expectancy
   - Treat P/L of exactly zero as a loss, documented inline
   - `dteBucketStats()`: 0DTE / 1-7DTE / >7DTE buckets, omitting empty buckets
   - _Requirements: 9.1, 9.2, 9.3, 9.4, 14.1_
 
-- [ ] 7. Port condor versus single-sided comparison
+- [x] 7. Port condor versus single-sided comparison
   - `condorVsSingleSide()` splitting into the three canonical structures
   - Render empty groups with a zero count rather than omitting them
   - _Requirements: 10.1, 10.2, 10.3, 10.4_
 
-- [ ] 8. Port width breakdown and counterfactual
+- [x] 8. Port width breakdown and counterfactual
   - `widthBreakdown()` grouping by width, adding average credit collected per group
   - `widthCounterfactual()` rescaling net P/L by target-over-actual width
   - Exclude null and zero width from both
-  - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
+  - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.8_
 
-- [ ] 9. Port statistical checks
+- [x] 9. Port statistical checks
   - `runsTest()` with Wald-Wolfowitz z-score and two-sided p-value
   - Implement `erf` via Abramowitz-Stegun 7.1.26
   - Return no statistic plus a note below 10 trades or fewer than 2 wins or 2 losses
   - `lossConcentration()` for top-3 and top-5 loss share
   - `bucketSignificance()` with multiplicative `comb()`, returning the reduced ratio
   - Return no p-value plus a Fisher-exact note when losses split across groups
-  - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 13.1, 13.2, 13.3, 13.4, 13.5_
+  - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 13.1, 13.2, 13.3, 13.4, 13.5, 13.6_
 
-- [ ] 10. Port calendar and bar series shaping
+- [x] 10. Port calendar and bar series shaping
   - `calendarSeries()` collapsing by date with a mixed category for multi-structure dates
   - `barSeries()` one row per trade, plus net, average per trade, and count aggregates
   - _Requirements: 8.1, 8.3, 8.6, 8.7, 8.8_
 
-- [ ] 11. Test ResearchAnalytics
+- [x] 11. Test ResearchAnalytics
   - Fixture file of hand-constructed trades with hand-computed expected outputs
   - One test per statistic against the fixture
   - Empty, single-trade, all-wins, all-losses, all-null-width cases for each statistic
@@ -108,7 +108,7 @@
   - Empty state naming the active filters when the filtered set is empty
   - Gross-of-fees notice when the dataset had no fee columns
   - Note rendering for every unavailable statistic
-  - _Requirements: 1.4, 5.7, 12.6, 13.6_
+  - _Requirements: 1.4, 5.7, 12.6, 13.7_
 
 ## Phase 4: Outputs
 
@@ -131,7 +131,7 @@
   - StatBlock for runs test, loss concentration, significance, rendering notes when unavailable
   - Wide tables scroll inside their own container
   - Counterfactual labelled a linear approximation
-  - _Requirements: 9.5, 11.6, 11.7, 12.6, 13.6, 15.5_
+  - _Requirements: 9.5, 11.6, 11.7, 12.6, 13.7, 15.5_
 
 - [ ] 20. Section layout and lazy rendering
   - Wrap each table and stat output in `CollapsibleSection`

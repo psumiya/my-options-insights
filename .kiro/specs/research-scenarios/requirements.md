@@ -173,6 +173,7 @@ computed on calendar dates so that same-day expirations reliably read as 0DTE.
 5. THE Research Analytics module SHALL exclude trades with null or zero width from both the breakdown and the counterfactual
 6. THE Research Tab SHALL display the actual net P/L alongside the counterfactual figures for direct comparison
 7. THE Research Tab SHALL label the counterfactual as a linear approximation, stating that it assumes loss magnitude scales proportionally with width
+8. THE Broker Adapter SHALL expose the credit taken in at open as a field distinct from total credit, and THE Research Analytics module SHALL use it for average credit collected, so that sell-to-close proceeds do not inflate the figure
 
 ### Requirement 12: Streak and Concentration Checks
 
@@ -194,11 +195,12 @@ computed on calendar dates so that same-day expirations reliably read as 0DTE.
 #### Acceptance Criteria
 
 1. THE Research Analytics module SHALL split the filtered set into two groups by a numeric threshold on a chosen column
-2. WHEN every observed loss falls in one group, THE Research Analytics module SHALL compute the hypergeometric probability of that arrangement occurring by chance
-3. WHEN losses are split across both groups, THE Research Analytics module SHALL return no probability and SHALL state that a full Fisher exact test is required
-4. WHEN the filtered set contains no losses, THE Research Analytics module SHALL return no probability and SHALL state that there are nothing to test
-5. THE Research Analytics module SHALL return both group sizes, total loss count, and loss count in the threshold group in all cases
-6. THE Research Tab SHALL render the no-probability cases as an explicit stated condition, never as a blank or zero value
+2. WHEN every observed loss falls in one group, THE Research Analytics module SHALL compute the hypergeometric probability of that arrangement occurring by chance, whichever of the two groups the losses fell in
+3. WHEN every observed loss falls in one group, THE Research Analytics module SHALL report which group the losses concentrated in
+4. WHEN losses are split across both groups, THE Research Analytics module SHALL return no probability and SHALL state that a full Fisher exact test is required
+5. WHEN the filtered set contains no losses, THE Research Analytics module SHALL return no probability and SHALL state that there is nothing to test
+6. THE Research Analytics module SHALL return both group sizes, total loss count, and loss count in the threshold group in all cases
+7. THE Research Tab SHALL render the no-probability cases as an explicit stated condition, never as a blank or zero value
 
 ### Requirement 14: Determinism and Test Coverage
 

@@ -101,6 +101,18 @@ A mapping table in the new module translates in one direction only — display l
 stay as they are, canonical identifiers are internal. Unmapped labels are excluded
 from structure-specific cuts, with the excluded count surfaced per Requirement 4.5.
 
+The Robinhood adapter emits `Put Credit Spread` and `Call Credit Spread` directly
+(`js/broker-adapters.js:200,209`), so the table covers five labels across the two
+brokers, not three.
+
+### 5. Opening credit
+
+`widthBreakdown` reports average credit collected per width group. The app's `Credit`
+field sums every positive leg value including sell-to-close proceeds, so it overstates
+what a structure was originally sold for. `aggregateStrategyLegs()` gains an
+`OpenCredit` field summing positive values across opening legs only, matching the
+reference implementation's `open_credit`.
+
 ## Architecture
 
 ### Component Structure
@@ -190,10 +202,18 @@ Port notes:
 - `runsTest` needs an `erf` implementation for the p-value; JavaScript has none
   built in. Use the Abramowitz-Stegun 7.1.26 approximation, accurate to ~1e-7, well
   inside the 3-decimal rounding the output uses.
-- `bucketSignificance` needs `comb(n, k)`. Compute multiplicatively in a loop rather
-  than via factorials to avoid overflow past n≈170, and return the ratio
-  `comb(a, losses) / comb(total, losses)` as a single reduced product to preserve
-  precision.
+- `bucketSignificance` needs `comb(n, k)`. Rather than computing the two binomials
+  and dividing, evaluate `comb(a, k) / comb(n, k)` directly as the running product
+  `∏ (a - i) / (n - i)`, which is exact and cannot overflow.
+- `bucketSignificance` also measures the case where *no* loss fell in the threshold
+  group, which is equally one-sided and equally answerable. The reference
+  implementation only checked the threshold group and so left an
+  all-losses-below-threshold pattern unmeasured; real sample data hits this. A
+  `concentratedIn` field names which side, or null when losses genuinely split.
+- `applyFilter` treats `structures: null` as no structure filter at all, distinct
+  from selecting all three. The DTE-bucket and streak-check presets need every
+  strategy in scope, not just the three canonical structures, so the frozen scenario
+  list cannot be expressed without that distinction.
 - `calendarSeries` collapses by date and emits `mixed` when a date has more than one
   structure; `barSeries` does not collapse, one row per trade. Same filter, different
   shape — keep both, they answer different questions (Requirement 8.8).
