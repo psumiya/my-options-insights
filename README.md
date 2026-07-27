@@ -87,6 +87,20 @@ P/L is **net of commissions and fees** wherever the broker export provides them.
 TastyTrade exports do; Robinhood's `Amount` column is already net; the generic
 format has no fee columns, in which case the Research tab says P/L is gross of fees.
 
+The headline figure is **Realized P/L**, which counts every retired leg. Brokers
+settle leg by leg, so half of a strangle can be realized while the position is
+still open. This is the figure that ties to a broker statement; individual trades
+stay grouped by strategy, and a strategy is only marked closed once every one of
+its legs is gone.
+
+Two things cannot be reconciled from a transaction export alone, and the app says
+so rather than guessing:
+
+- **Positions opened before the export window.** Only the closing side is known,
+  so their P/L is understated. Re-export covering the opening dates to fix.
+- **Positions spanning a year boundary.** TastyTrade's year-to-date report carries
+  the prior year-end *mark* as cost basis; the app computes P/L from entry to exit.
+
 ## Filters
 
 - **Date Range**: Last 7 days, 30 days, 12 months, Year To Date, All time

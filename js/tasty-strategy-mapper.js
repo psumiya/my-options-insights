@@ -14,9 +14,22 @@ function extractStrike(symbol) {
   return parseInt(match[1]) / 1000;
 }
 
-function extractOptionType(symbol) {
-  if (symbol.includes('P')) return 'PUT';
-  if (symbol.includes('C')) return 'CALL';
+/**
+ * Call or put for one leg
+ * Prefers the ledger's own column. The OCC fallback reads the type character
+ * that sits between the expiry and the strike: a substring search would see the
+ * P in SPXW or PLTR and call every one of their contracts a put.
+ * @param {string} symbol - OCC symbol
+ * @param {Object} [trade] - Raw CSV row, when available
+ * @returns {string|null} - 'PUT', 'CALL', or null
+ */
+function extractOptionType(symbol, trade) {
+  const declared = trade && String(trade['Call or Put'] || '').trim().toUpperCase();
+  if (declared === 'PUT' || declared === 'CALL') return declared;
+
+  const match = String(symbol || '').match(/(\d{6})([CP])(\d{8})$/);
+  if (match) return match[2] === 'P' ? 'PUT' : 'CALL';
+
   return null;
 }
 
@@ -24,26 +37,70 @@ function isOpeningAction(action) {
   return action === 'BUY_TO_OPEN' || action === 'SELL_TO_OPEN';
 }
 
+// Group id prefix for closing legs whose opening order predates the export
+const BOUNDARY_GROUP_PREFIX = 'preexisting:';
+
 function isClosingAction(action) {
   return action === 'BUY_TO_CLOSE' || action === 'SELL_TO_CLOSE';
 }
 
+/**
+ * Whether a row removes an option position without a trade
+ * TastyTrade books expirations, assignments and exercises as "Receive Deliver"
+ * rather than "Trade". They are the normal exit for anything held to
+ * expiration, so a position whose only exit is one of these looks open forever
+ * if they are ignored. Cash-settled index options (SPX and friends) close this
+ * way almost exclusively, and their rows carry the settlement cash, so dropping
+ * them loses the money as well as the exit.
+ *
+ * Recognized by behaviour rather than by sub-type name: any Receive Deliver row
+ * against an option that either closes explicitly or carries no action at all
+ * is removing the position. Matching on names would miss the next variant, and
+ * this ledger already uses five ("Expiration", "Assignment", "Exercise", and
+ * the "Cash Settled" forms of the latter two).
+ * @param {Object} trade - Raw CSV row
+ * @returns {boolean}
+ */
+function isOptionRemoval(trade) {
+  if (trade.Type !== 'Receive Deliver') return false;
+  if (trade['Instrument Type'] !== 'Equity Option') return false;
+
+  const action = String(trade.Action || '').trim();
+  return action === '' || isClosingAction(action);
+}
+
+/**
+ * The closing action a row represents
+ * Expirations carry one already; assignments and exercises leave Action blank,
+ * so infer the direction from the position being removed.
+ * @param {Object} trade - Raw CSV row
+ * @param {number} netQuantity - Signed quantity currently open for this contract
+ * @returns {string} - Action to treat this row as
+ */
+function effectiveAction(trade, netQuantity) {
+  if (trade.Action) return trade.Action;
+  if (!isOptionRemoval(trade)) return trade.Action;
+
+  // Closing a short means buying it back, and vice versa
+  return netQuantity < 0 ? 'BUY_TO_CLOSE' : 'SELL_TO_CLOSE';
+}
+
 function getSignedQuantity(trade) {
   const qty = parseInt(trade.Quantity);
-  return trade.Action.startsWith('SELL') ? -qty : qty;
+  return String(trade.Action || '').startsWith('SELL') ? -qty : qty;
 }
 
 function classifyStrategy(orderGroup) {
   const legs = orderGroup.length;
   
-  const calls = orderGroup.filter(t => extractOptionType(t.Symbol) === 'CALL');
-  const puts = orderGroup.filter(t => extractOptionType(t.Symbol) === 'PUT');
+  const calls = orderGroup.filter(t => extractOptionType(t.Symbol, t) === 'CALL');
+  const puts = orderGroup.filter(t => extractOptionType(t.Symbol, t) === 'PUT');
   const buys = orderGroup.filter(t => t.Action === 'BUY_TO_OPEN');
   const sells = orderGroup.filter(t => t.Action === 'SELL_TO_OPEN');
   
   if (legs === 1) {
     const trade = orderGroup[0];
-    const optionType = extractOptionType(trade.Symbol);
+    const optionType = extractOptionType(trade.Symbol, trade);
     
     if (optionType === 'CALL') {
       return trade.Action === 'BUY_TO_OPEN' ? 'Long Call' : 'Short Call';
@@ -57,8 +114,8 @@ function classifyStrategy(orderGroup) {
     const sameStrike = strikes[0] === strikes[1];
     
     if (calls.length === 2) {
-      const longCall = buys.find(t => extractOptionType(t.Symbol) === 'CALL');
-      const shortCall = sells.find(t => extractOptionType(t.Symbol) === 'CALL');
+      const longCall = buys.find(t => extractOptionType(t.Symbol, t) === 'CALL');
+      const shortCall = sells.find(t => extractOptionType(t.Symbol, t) === 'CALL');
       
       if (longCall && shortCall) {
         const longStrike = extractStrike(longCall.Symbol);
@@ -68,8 +125,8 @@ function classifyStrategy(orderGroup) {
     }
     
     if (puts.length === 2) {
-      const longPut = buys.find(t => extractOptionType(t.Symbol) === 'PUT');
-      const shortPut = sells.find(t => extractOptionType(t.Symbol) === 'PUT');
+      const longPut = buys.find(t => extractOptionType(t.Symbol, t) === 'PUT');
+      const shortPut = sells.find(t => extractOptionType(t.Symbol, t) === 'PUT');
       
       if (longPut && shortPut) {
         const longStrike = extractStrike(longPut.Symbol);
@@ -94,115 +151,363 @@ function classifyStrategy(orderGroup) {
     }
   }
   
+  // Three legs of one type is a butterfly or a broken-wing variant of one
+  if (legs === 3 && (puts.length === 3 || calls.length === 3)) {
+    return 'Butterfly';
+  }
+
   return 'Custom';
 }
 
 function isOptionTrade(trade) {
-  return trade.Type === 'Trade' && trade['Instrument Type'] === 'Equity Option';
+  if (trade['Instrument Type'] !== 'Equity Option') return false;
+  return trade.Type === 'Trade' || isOptionRemoval(trade);
 }
 
+/**
+ * Accumulate the realized money of one matched open/close pair onto its group
+ * @param {Map} store - Group id to running totals
+ * @param {string} orderId - Group id
+ * @param {Object} amounts - { value, commissions, fees, incompleteBasis }
+ */
+function addRealized(store, orderId, amounts) {
+  const entry = store.get(orderId)
+    || { value: 0, commissions: 0, fees: 0, incompleteBasis: false };
+
+  entry.value += amounts.value;
+  entry.commissions += amounts.commissions;
+  entry.fees += amounts.fees;
+  if (amounts.incompleteBasis) entry.incompleteBasis = true;
+  store.set(orderId, entry);
+}
+
+/**
+ * Prorate a leg's money across a partial quantity
+ * A single closing row can retire lots opened by several different orders, so
+ * its value, commissions and fees are split in proportion to the quantity each
+ * lot takes.
+ * @param {Object} trade - Raw CSV row
+ * @param {number} qty - Quantity attributed to this piece
+ * @param {number} totalQty - Full quantity of the row
+ * @returns {Object} - Money fields for this piece
+ */
+function proratedAmounts(trade, qty, totalQty) {
+  const share = totalQty > 0 ? qty / totalQty : 1;
+  const scale = value => Math.round(parseAmount(value) * share * 100) / 100;
+
+  return {
+    Value: scale(trade.Value !== undefined && trade.Value !== '' ? trade.Value : trade.Total),
+    Commissions: scale(trade.Commissions),
+    Fees: scale(trade.Fees)
+  };
+}
+
+/**
+ * Reconstruct option positions from a transaction ledger
+ *
+ * Positions are tracked as FIFO lots keyed on contract *and* opening order,
+ * not on contract alone. Selling the same strike twice in two orders opens two
+ * positions, and attributing both to whichever order came first merges them
+ * into one trade with the wrong leg count and the wrong strategy.
+ *
+ * @param {Array} trades - All raw CSV rows
+ * @returns {Object} - { enrichedTrades, strategyInfo }
+ */
 function processOptionTrades(trades) {
   const optionTrades = trades.filter(isOptionTrade);
-  
+
+  // Lot matching depends on ledger order, and the export is newest first
+  const chronological = optionTrades
+    .slice()
+    .sort((a, b) => {
+      const da = parseDate(a.Date);
+      const db = parseDate(b.Date);
+      return (da ? da.getTime() : 0) - (db ? db.getTime() : 0);
+    });
+
+  // Classify each opening order from the legs it opened
   const orderGroups = {};
-  const openingTrades = optionTrades.filter(t => isOpeningAction(t.Action));
-  
-  openingTrades.forEach(trade => {
-    const orderId = trade['Order #'];
-    if (!orderGroups[orderId]) {
-      orderGroups[orderId] = [];
-    }
-    orderGroups[orderId].push(trade);
-  });
-  
-  const positionRegistry = {};
+  chronological
+    .filter(trade => isOpeningAction(trade.Action))
+    .forEach(trade => {
+      const orderId = trade['Order #'];
+      if (!orderGroups[orderId]) orderGroups[orderId] = [];
+      orderGroups[orderId].push(trade);
+    });
+
   const strategyInfo = {};
-  
+  const legNumbers = new Map();
+
   Object.entries(orderGroups).forEach(([orderId, group]) => {
-    const strategy = classifyStrategy(group);
-    const totalLegs = group.length;
-    
     strategyInfo[orderId] = {
-      strategy,
-      totalLegs,
+      strategy: classifyStrategy(group),
+      totalLegs: group.length,
       underlyingSymbol: group[0]['Underlying Symbol']
     };
-    
     group.forEach((trade, index) => {
-      const symbol = trade.Symbol;
-      
-      if (!positionRegistry[symbol]) {
-        positionRegistry[symbol] = {
-          openOrderNumber: orderId,
-          strategy,
-          strategyGroupId: orderId,
-          totalLegs,
-          legNumber: index + 1,
-          netQuantity: 0,
-          trades: []
-        };
-      }
-      
-      positionRegistry[symbol].netQuantity += getSignedQuantity(trade);
-      positionRegistry[symbol].trades.push(trade);
+      legNumbers.set(`${orderId}|${trade.Symbol}`, index + 1);
     });
   });
-  
-  const enrichedTrades = trades.map(trade => {
-    if (!isOptionTrade(trade)) {
-      return {
-        ...trade,
-        Strategy: '',
-        'Strategy Group ID': '',
-        'Leg Number': '',
-        'Total Legs': ''
-      };
-    }
-    
+
+  const tag = (trade, action, orderId, amounts, quantity) => {
+    const info = strategyInfo[orderId];
+    return {
+      ...trade,
+      ...(amounts || {}),
+      ...(quantity === undefined ? {} : { Quantity: quantity }),
+      Action: action,
+      Strategy: info ? info.strategy : 'Opened before this export',
+      'Strategy Group ID': orderId,
+      'Leg Number': legNumbers.get(`${orderId}|${trade.Symbol}`) || 1,
+      'Total Legs': info ? info.totalLegs : 1
+    };
+  };
+
+  const openLots = new Map();
+  const enrichedTrades = [];
+  const realizedByGroup = new Map();
+
+  // Which group last retired each contract, so a follow-up settlement row
+  // lands on the same position instead of looking pre-existing
+  const lastGroupByContract = new Map();
+
+  chronological.forEach(trade => {
     const symbol = trade.Symbol;
-    
+    const quantity = Math.abs(parseInt(trade.Quantity, 10) || 0);
+    const queue = openLots.get(symbol) || [];
+    const netOpen = queue.reduce((sum, lot) => sum + lot.signed, 0);
+    const action = effectiveAction(trade, netOpen);
+
+    if (isOpeningAction(action)) {
+      const orderId = trade['Order #'];
+      if (!openLots.has(symbol)) openLots.set(symbol, []);
+      openLots.get(symbol).push({
+        orderId,
+        remaining: quantity,
+        signed: action === 'SELL_TO_OPEN' ? -quantity : quantity,
+        // Per-unit money, so a matched pair's realized P/L is computable no
+        // matter how the closing quantity is split across lots
+        value: parseAmount(trade.Value) / quantity,
+        commissions: parseAmount(trade.Commissions) / quantity,
+        fees: parseAmount(trade.Fees) / quantity
+      });
+      enrichedTrades.push(tag(trade, action, orderId));
+      return;
+    }
+
+    if (isClosingAction(action)) {
+      let unmatched = quantity;
+      const pieces = [];
+      const closeValue = parseAmount(trade.Value) / quantity;
+      const closeCommissions = parseAmount(trade.Commissions) / quantity;
+      const closeFees = parseAmount(trade.Fees) / quantity;
+
+      while (unmatched > 0 && queue.length > 0) {
+        const lot = queue[0];
+        const taken = Math.min(unmatched, lot.remaining);
+        pieces.push({ orderId: lot.orderId, quantity: taken });
+        lastGroupByContract.set(symbol, lot.orderId);
+
+        // The broker realizes P/L leg by leg, the moment a contract is retired,
+        // even while other legs of the same strategy stay open. Recording it
+        // here lets the app report a realized total that ties to the broker
+        // without giving up strategy-level trades.
+        addRealized(realizedByGroup, lot.orderId, {
+          value: taken * (lot.value + closeValue),
+          commissions: taken * (lot.commissions + closeCommissions),
+          fees: taken * (lot.fees + closeFees)
+        });
+
+        lot.remaining -= taken;
+        lot.signed -= Math.sign(lot.signed) * taken;
+        unmatched -= taken;
+        if (lot.remaining <= 0) queue.shift();
+      }
+
+      // Whatever is left was opened before this export window began. Keeping it
+      // as its own trade preserves realized P/L that would otherwise be dropped.
+      // A residual close on a contract this export did see opened belongs to the
+      // position that already retired it, not to a pre-existing one. Cash-settled
+      // index options rely on this: tastytrade books the retirement and the cash
+      // as two rows, an Expiration at zero plus a Cash Settled row carrying the
+      // settlement, so the second row always arrives with the lot already gone.
+      if (unmatched > 0) {
+        const previous = lastGroupByContract.get(symbol);
+        const residualId = previous || `${BOUNDARY_GROUP_PREFIX}${symbol}`;
+
+        pieces.push({ orderId: residualId, quantity: unmatched });
+        addRealized(realizedByGroup, residualId, {
+          value: unmatched * closeValue,
+          commissions: unmatched * closeCommissions,
+          fees: unmatched * closeFees,
+          incompleteBasis: !previous
+        });
+      }
+
+      pieces.forEach(piece => {
+        enrichedTrades.push(tag(
+          trade,
+          action,
+          piece.orderId,
+          proratedAmounts(trade, piece.quantity, quantity),
+          piece.quantity
+        ));
+      });
+      return;
+    }
+
+    enrichedTrades.push(trade);
+  });
+
+  // Non-option rows are passed through so row-level consumers still see them
+  trades.filter(trade => !isOptionTrade(trade)).forEach(trade => {
+    enrichedTrades.push({
+      ...trade,
+      Strategy: '',
+      'Strategy Group ID': '',
+      'Leg Number': '',
+      'Total Legs': ''
+    });
+  });
+
+  return { enrichedTrades, strategyInfo, realizedByGroup };
+}
+
+/**
+ * Whether a row belongs to a share position
+ * Assignment and exercise convert an option into stock, and the resulting
+ * position carries its own realized P/L. Ignoring it leaves an open holding
+ * invisible and the symbol's realized total short of the broker's.
+ * @param {Object} trade - Raw CSV row
+ * @returns {boolean}
+ */
+function isEquityTrade(trade) {
+  if (trade['Instrument Type'] !== 'Equity') return false;
+  return trade.Type === 'Trade' || trade.Type === 'Receive Deliver';
+}
+
+/**
+ * Reconstruct share positions from a transaction ledger
+ * FIFO lots per symbol, the same treatment options get. One trade per lot.
+ * @param {Array} trades - All raw CSV rows
+ * @returns {Array} - Trades in internal format
+ */
+function processEquityTrades(trades) {
+  const chronological = trades
+    .filter(isEquityTrade)
+    .slice()
+    .sort((a, b) => {
+      const da = parseDate(a.Date);
+      const db = parseDate(b.Date);
+      return (da ? da.getTime() : 0) - (db ? db.getTime() : 0);
+    });
+
+  const openLots = new Map();
+  const finished = [];
+
+  const newLot = (trade, quantity, isLong) => ({
+    symbol: trade.Symbol,
+    isLong,
+    quantity,
+    remaining: quantity,
+    entry: parseDate(trade.Date),
+    exit: null,
+    credit: 0,
+    debit: 0,
+    commissions: 0,
+    fees: 0
+  });
+
+  const applyMoney = (lot, trade, quantity, totalQuantity) => {
+    const amounts = proratedAmounts(trade, quantity, totalQuantity);
+    if (amounts.Value > 0) {
+      lot.credit += amounts.Value;
+    } else {
+      lot.debit += Math.abs(amounts.Value);
+    }
+    lot.commissions += -amounts.Commissions;
+    lot.fees += -amounts.Fees;
+  };
+
+  chronological.forEach(trade => {
+    const symbol = trade.Symbol;
+    const quantity = Math.abs(parseInt(trade.Quantity, 10) || 0);
+    if (!quantity) return;
+
+    if (!openLots.has(symbol)) openLots.set(symbol, []);
+    const queue = openLots.get(symbol);
+
     if (isOpeningAction(trade.Action)) {
-      const position = positionRegistry[symbol];
-      
-      return {
-        ...trade,
-        Strategy: position.strategy,
-        'Strategy Group ID': position.strategyGroupId,
-        'Leg Number': position.legNumber,
-        'Total Legs': position.totalLegs
-      };
-    } else if (isClosingAction(trade.Action)) {
-      const position = positionRegistry[symbol];
-      
-      if (position) {
-        position.netQuantity += getSignedQuantity(trade);
-        
-        return {
-          ...trade,
-          Strategy: position.strategy,
-          'Strategy Group ID': position.strategyGroupId,
-          'Leg Number': position.legNumber,
-          'Total Legs': position.totalLegs
-        };
-      } else {
-        return {
-          ...trade,
-          Strategy: 'Unknown',
-          'Strategy Group ID': null,
-          'Leg Number': null,
-          'Total Legs': null
-        };
+      const lot = newLot(trade, quantity, trade.Action === 'BUY_TO_OPEN');
+      applyMoney(lot, trade, quantity, quantity);
+      queue.push(lot);
+      return;
+    }
+
+    if (isClosingAction(trade.Action)) {
+      let unmatched = quantity;
+
+      while (unmatched > 0 && queue.length > 0) {
+        const lot = queue[0];
+        const taken = Math.min(unmatched, lot.remaining);
+        applyMoney(lot, trade, taken, quantity);
+        lot.remaining -= taken;
+        lot.exit = parseDate(trade.Date);
+        unmatched -= taken;
+        if (lot.remaining <= 0) {
+          finished.push(lot);
+          queue.shift();
+        }
+      }
+
+      // Shares acquired before this export window began
+      if (unmatched > 0) {
+        const lot = newLot(trade, unmatched, false);
+        lot.entry = null;
+        lot.exit = parseDate(trade.Date);
+        lot.remaining = 0;
+        applyMoney(lot, trade, unmatched, quantity);
+        finished.push(lot);
       }
     }
-    
-    return trade;
   });
-  
-  return {
-    enrichedTrades,
-    positionRegistry,
-    strategyInfo
-  };
+
+  const stillOpen = [];
+  openLots.forEach(queue => queue.forEach(lot => stillOpen.push(lot)));
+
+  return finished.concat(stillOpen).map(lot => ({
+    Symbol: lot.symbol,
+    Type: 'Stock',
+    Strategy: lot.isLong ? 'Long Stock' : 'Short Stock',
+    Strike: 0,
+    Expiry: null,
+    Volume: lot.quantity,
+    Entry: lot.entry,
+    Delta: 0,
+    Exit: lot.remaining <= 0 ? lot.exit : null,
+    Debit: Math.round(lot.debit * 100) / 100,
+    Credit: Math.round(lot.credit * 100) / 100,
+    RealizedGrossPL: lot.remaining <= 0
+      ? Math.round((lot.credit - lot.debit) * 100) / 100
+      : 0,
+    RealizedPL: lot.remaining <= 0
+      ? Math.round((lot.credit - lot.debit - lot.commissions - lot.fees) * 100) / 100
+      : 0,
+    OpenCredit: 0,
+    Commissions: Math.round(lot.commissions * 100) / 100,
+    Fees: Math.round(lot.fees * 100) / 100,
+    Width: null,
+    Account: 'TastyTrade',
+    _metadata: {
+      totalLegs: 1,
+      strategyGroupId: `stock:${lot.symbol}:${lot.entry ? lot.entry.toISOString().slice(0, 10) : 'preexisting'}`,
+      strikes: [],
+      legCount: 1,
+      feesAvailable: true,
+      multipleExpirations: false,
+      instrument: 'Equity'
+    }
+  }));
 }
 
 function parseCSVLine(line) {
@@ -273,10 +578,9 @@ function convertTastyWithStrategyInference(rows) {
   console.log('Enriched trades:', enrichedTrades.length);
   console.log('Strategy statistics:', result.stats);
   
-  // Filter to only option trades
-  const optionTrades = enrichedTrades.filter(t => 
-    t.Type === 'Trade' && t['Instrument Type'] === 'Equity Option'
-  );
+  // Filter to only option trades, including the Receive Deliver rows that
+  // close a position at expiration or assignment
+  const optionTrades = enrichedTrades.filter(isOptionTrade);
   
   console.log('Option trades:', optionTrades.length);
   
@@ -290,11 +594,35 @@ function convertTastyWithStrategyInference(rows) {
   
   strategyGroups.forEach((legs, groupId) => {
     const trade = aggregateStrategyLegs(legs);
-    if (trade) {
-      trades.push(trade);
+    if (!trade) return;
+
+    // What the broker counts as realized for this strategy so far: the legs
+    // already retired, whether or not the strategy as a whole is finished
+    const realized = result.realizedByGroup && result.realizedByGroup.get(groupId);
+    if (realized) {
+      // Gross matches the broker's "P/L Realized" column, which reports
+      // commissions and fees separately rather than netting them
+      trade.RealizedGrossPL = Math.round(realized.value * 100) / 100;
+      trade.RealizedPL = Math.round(
+        (realized.value + realized.commissions + realized.fees) * 100
+      ) / 100;
+      trade._metadata.incompleteBasis = realized.incompleteBasis;
+    } else {
+      trade.RealizedGrossPL = 0;
+      trade.RealizedPL = 0;
+      trade._metadata.incompleteBasis = false;
     }
+
+    trades.push(trade);
   });
   
+  // Share positions created by assignment or exercise carry their own P/L
+  const equityTrades = processEquityTrades(rows);
+  if (equityTrades.length) {
+    console.log('Share positions from assignment/exercise:', equityTrades.length);
+    equityTrades.forEach(t => trades.push(t));
+  }
+
   console.log('\n=== Results ===');
   console.log('Total trades created:', trades.length);
   
@@ -392,9 +720,30 @@ function aggregateStrategyLegs(legs) {
     leg.Action === 'BUY_TO_CLOSE' || leg.Action === 'SELL_TO_CLOSE'
   );
   
+  // A position is closed only when every contract it opened has been retired.
+  // Any single closing leg used to be enough, which reported a half-closed
+  // spread as done and pulled its unrealized P/L into the realized figures.
+  const netByContract = new Map();
+  legs.forEach(leg => {
+    const quantity = Math.abs(parseInt(leg.Quantity, 10) || 0);
+    let signed = 0;
+    if (isOpeningAction(leg.Action)) {
+      signed = leg.Action === 'SELL_TO_OPEN' ? -quantity : quantity;
+    } else if (isClosingAction(leg.Action)) {
+      signed = leg.Action === 'BUY_TO_CLOSE' ? quantity : -quantity;
+    }
+    netByContract.set(leg.Symbol, (netByContract.get(leg.Symbol) || 0) + signed);
+  });
+
+  // A group with no opening legs is a position opened before this export whose
+  // close we did see, so it is realized by definition
+  const fullyClosed = openingLegs.length === 0
+    ? closingLegs.length > 0
+    : [...netByContract.values()].every(net => net === 0);
+
   // Calculate dates
   const entryDate = findEarliestDate(openingLegs);
-  const exitDate = closingLegs.length > 0 ? findLatestDate(closingLegs) : null;
+  const exitDate = fullyClosed && closingLegs.length > 0 ? findLatestDate(closingLegs) : null;
   
   // Calculate total debit and credit across all legs
   let totalDebit = 0;
@@ -635,6 +984,7 @@ function processCSV(csvText) {
   
   return {
     enrichedTrades: result.enrichedTrades,
+    realizedByGroup: result.realizedByGroup,
     stats: generateStats(result)
   };
 }

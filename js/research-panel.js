@@ -466,16 +466,33 @@ class ResearchPanel {
       !trade._metadata || trade._metadata.feesAvailable !== true
     ).length;
 
-    if (!withoutFees) {
+    // Positions opened before the export window have no cost basis here, so
+    // their P/L is the closing side only and will not tie to a broker statement
+    const withoutBasis = this.filtered.filter(trade =>
+      trade._metadata && trade._metadata.incompleteBasis
+    ).length;
+
+    const notices = [];
+
+    if (withoutFees) {
+      notices.push(withoutFees === this.filtered.length
+        ? 'This broker export carries no commission or fee columns, so every P/L figure below is gross of fees.'
+        : `${withoutFees} of ${this.filtered.length} trades have no commission or fee data, so their P/L is gross of fees.`);
+    }
+
+    if (withoutBasis) {
+      notices.push(`${withoutBasis} trade${withoutBasis === 1 ? ' was' : 's were'} opened before this export begins, `
+        + 'so only the closing side is known and their P/L is understated. Re-export covering the opening dates to fix.');
+    }
+
+    if (!notices.length) {
       this.elements.notice.hidden = true;
       this.elements.notice.textContent = '';
       return;
     }
 
     this.elements.notice.hidden = false;
-    this.elements.notice.textContent = withoutFees === this.filtered.length
-      ? 'This broker export carries no commission or fee columns, so every P/L figure below is gross of fees.'
-      : `${withoutFees} of ${this.filtered.length} trades have no commission or fee data, so their P/L is gross of fees.`;
+    this.elements.notice.textContent = notices.join(' ');
   }
 
   focusSection(sectionId) {

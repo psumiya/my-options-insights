@@ -34,6 +34,19 @@ class AnalyticsEngine {
     const fees = parseFloat(trade.Fees) || 0;
     enriched.ProfitLoss = credit - debit - commissions - fees;
 
+    // What the broker counts as realized. Brokers settle leg by leg, so a
+    // half-closed strategy has realized P/L while still being an open position.
+    // Adapters that cannot distinguish the two fall back to the whole trade.
+    if (trade.RealizedPL !== undefined && trade.RealizedPL !== null) {
+      enriched.RealizedPL = trade.RealizedPL;
+      enriched.RealizedGrossPL = trade.RealizedGrossPL !== undefined
+        ? trade.RealizedGrossPL
+        : trade.RealizedPL;
+    } else {
+      enriched.RealizedPL = exitDate ? enriched.ProfitLoss : 0;
+      enriched.RealizedGrossPL = exitDate ? credit - debit : 0;
+    }
+
     // Calculate Premium Percentage (Requirement 2.3)
     if (credit > 0) {
       enriched.PremiumPercentage = (enriched.ProfitLoss / credit) * 100;
@@ -350,6 +363,13 @@ class AnalyticsEngine {
     
     // Calculate total P/L (Requirement 13.4)
     const totalPL = closedTrades.reduce((sum, trade) => sum + trade.ProfitLoss, 0);
+
+    // Realized P/L counts every retired leg, including those inside positions
+    // that are still open, which is how brokers report it
+    const realizedPL = trades.reduce((sum, trade) => sum + (trade.RealizedPL || 0), 0);
+    const openPositions = trades.filter(trade => trade.Result === 'Open').length;
+    const incompleteBasis = trades.filter(trade =>
+      trade._metadata && trade._metadata.incompleteBasis).length;
     
     // Calculate average win (Requirement 13.5)
     const totalWinAmount = wins.reduce((sum, trade) => sum + trade.ProfitLoss, 0);
@@ -359,6 +379,9 @@ class AnalyticsEngine {
       totalTrades,
       winRate,
       totalPL,
+      realizedPL,
+      openPositions,
+      incompleteBasis,
       averageWin
     };
   }
