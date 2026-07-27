@@ -17,16 +17,22 @@ class AnalyticsEngine {
     const exitDate = trade.Exit ? this._parseDate(trade.Exit) : null;
 
     // Calculate Days to Expire at Entry (Requirement 2.1)
+    // Uses calendar-date differencing so an afternoon entry on its own
+    // expiration date still reads as 0 DTE
     if (entryDate && expiryDate) {
-      enriched.DaysToExpireAtEntry = this._daysBetween(entryDate, expiryDate);
+      enriched.DaysToExpireAtEntry = this._daysBetweenDates(entryDate, expiryDate);
     } else {
       enriched.DaysToExpireAtEntry = null;
     }
 
     // Calculate P/L (Requirement 2.2)
+    // Net of commissions and fees; both are stored as positive cost magnitudes
+    // and default to zero for brokers whose exports omit them
     const credit = parseFloat(trade.Credit) || 0;
     const debit = parseFloat(trade.Debit) || 0;
-    enriched.ProfitLoss = credit - debit;
+    const commissions = parseFloat(trade.Commissions) || 0;
+    const fees = parseFloat(trade.Fees) || 0;
+    enriched.ProfitLoss = credit - debit - commissions - fees;
 
     // Calculate Premium Percentage (Requirement 2.3)
     if (credit > 0) {
@@ -90,6 +96,23 @@ class AnalyticsEngine {
     const msPerDay = 1000 * 60 * 60 * 24;
     const diffMs = endDate.getTime() - startDate.getTime();
     return Math.round(diffMs / msPerDay);
+  }
+
+  /**
+   * Calculate calendar days between two dates, ignoring time of day
+   * Entry timestamps carry a time component while expirations are midnight,
+   * so differencing raw timestamps rounds same-day trades to 0 or -1 depending
+   * on the hour they were opened. Normalizing both ends first avoids that.
+   * @param {Date} startDate - Start date
+   * @param {Date} endDate - End date
+   * @returns {number} - Number of calendar days between dates
+   * @private
+   */
+  _daysBetweenDates(startDate, endDate) {
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    return Math.round((end.getTime() - start.getTime()) / msPerDay);
   }
 
   /**

@@ -399,10 +399,10 @@ function aggregateStrategyLegs(legs) {
   // Calculate total debit and credit across all legs
   let totalDebit = 0;
   let totalCredit = 0;
-  
+
   legs.forEach(leg => {
     const amount = parseAmount(leg.Value || leg.Total || '0');
-    
+
     // Positive amount = credit (we received money)
     // Negative amount = debit (we paid money)
     if (amount > 0) {
@@ -411,7 +411,26 @@ function aggregateStrategyLegs(legs) {
       totalDebit += Math.abs(amount);
     }
   });
-  
+
+  // Sum commissions and fees across all legs. TastyTrade reports both as
+  // negative values (money leaving the account), so negate to store them as
+  // positive cost magnitudes that callers subtract from gross P/L.
+  const feesAvailable = legs.some(leg =>
+    Object.prototype.hasOwnProperty.call(leg, 'Commissions') ||
+    Object.prototype.hasOwnProperty.call(leg, 'Fees')
+  );
+
+  let totalCommissions = 0;
+  let totalFees = 0;
+
+  legs.forEach(leg => {
+    totalCommissions += -parseAmount(leg.Commissions);
+    totalFees += -parseAmount(leg.Fees);
+  });
+
+  totalCommissions = Math.round(totalCommissions * 100) / 100;
+  totalFees = Math.round(totalFees * 100) / 100;
+
   // Determine option type from legs
   const optionType = determineOptionType(openingLegs);
   
@@ -425,9 +444,22 @@ function aggregateStrategyLegs(legs) {
     ? strikes[Math.floor(strikes.length / 2)] 
     : 0;
   
-  // Get expiration date from first opening leg
-  const expiryDate = parseDate(firstLeg['Expiration Date']);
-  
+  // Use the nearest expiration across opening legs, not just the first leg's.
+  // Legs expiring on different dates make this a calendar or diagonal, which
+  // downstream DTE cuts need to know about.
+  const legExpirations = openingLegs
+    .map(leg => parseDate(leg['Expiration Date']))
+    .filter(date => date !== null);
+
+  const expiryDate = legExpirations.length > 0
+    ? new Date(Math.min(...legExpirations.map(date => date.getTime())))
+    : parseDate(firstLeg['Expiration Date']);
+
+  const multipleExpirations =
+    new Set(legExpirations.map(date => date.getTime())).size > 1;
+
+  const width = deriveWidth(openingLegs);
+
   // Get volume (use first leg's quantity as representative)
   const volume = Math.abs(parseInt(firstLeg.Quantity) || 1);
   
@@ -443,15 +475,57 @@ function aggregateStrategyLegs(legs) {
     Exit: exitDate,
     Debit: totalDebit,
     Credit: totalCredit,
+    Commissions: totalCommissions,
+    Fees: totalFees,
+    Width: width,
     Account: 'TastyTrade',
     // Store additional metadata for reference
     _metadata: {
       totalLegs: firstLeg['Total Legs'] || legs.length,
       strategyGroupId: firstLeg['Strategy Group ID'],
       strikes: strikes,
-      legCount: legs.length
+      legCount: legs.length,
+      feesAvailable: feesAvailable,
+      multipleExpirations: multipleExpirations
     }
   };
+}
+
+/**
+ * Derive spread width from the opening legs of a strategy
+ * Two same-type legs use the strike difference; a four-leg condor or butterfly
+ * uses the wider of its two wings. Structures with no meaningful width
+ * (single legs, straddles, strangles) return null.
+ * @param {Array} openingLegs - Array of opening leg transactions
+ * @returns {number|null} - Spread width, or null when not applicable
+ */
+function deriveWidth(openingLegs) {
+  const strikeOf = leg => parseFloat(leg['Strike Price']);
+  const typeOf = leg => String(leg['Call or Put'] || '').toUpperCase();
+
+  const usable = openingLegs.filter(leg => {
+    const strike = strikeOf(leg);
+    return Number.isFinite(strike) && strike > 0;
+  });
+
+  // A partially parseable set would give a misleading width
+  if (usable.length !== openingLegs.length) return null;
+
+  const puts = usable.filter(leg => typeOf(leg) === 'PUT').map(strikeOf).sort((a, b) => a - b);
+  const calls = usable.filter(leg => typeOf(leg) === 'CALL').map(strikeOf).sort((a, b) => a - b);
+
+  let width = null;
+
+  if (usable.length === 2 && (puts.length === 2 || calls.length === 2)) {
+    const side = puts.length === 2 ? puts : calls;
+    width = side[1] - side[0];
+  } else if (usable.length === 4 && puts.length === 2 && calls.length === 2) {
+    width = Math.max(puts[1] - puts[0], calls[1] - calls[0]);
+  }
+
+  // Same-strike legs grouped into one order (a roll, for instance) compute to
+  // zero, which is not a width
+  return width > 0 ? width : null;
 }
 
 /**
