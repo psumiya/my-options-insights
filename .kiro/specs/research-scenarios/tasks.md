@@ -77,14 +77,14 @@
 
 ## Phase 3: Tab shell and controls
 
-- [ ] 12. Add the Research tab to the dashboard shell
+- [x] 12. Add the Research tab to the dashboard shell
   - Tab button after `tab-strategies` and panel after `tab-panel-strategies` in `index.html`
   - Script tags for the new modules
   - Construct `ResearchPanel` in `DashboardController.initialize()` and wire `update()` into the existing data-load and filter-change paths
   - Verify `TabManager` picks the tab up with no changes
   - _Requirements: 5.1, 5.9_
 
-- [ ] 13. Build the filter bar
+- [x] 13. Build the filter bar
   - Underlying selector populated from the loaded dataset
   - DTE cut selector (all / 0DTE / non-zero) and multi-select structure selector
   - Default to the underlying with the most closed trades, all DTE, all structures
@@ -92,19 +92,19 @@
   - Recompute every visible output on change
   - _Requirements: 5.2, 5.3, 5.4, 5.5, 5.8_
 
-- [ ] 14. Build scenario presets
+- [x] 14. Build scenario presets
   - `js/research-scenarios.js` with the eleven seeded cuts as data
   - Chip row above the filter bar, applying filters and scrolling the target output into view
   - Clear active styling on manual filter change
   - Disable chips whose underlying is absent, with a hover explanation
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
 
-- [ ] 15. Build the caption helper
+- [x] 15. Build the caption helper
   - Single `buildCaption()` deriving provenance text from filter state plus count and exclusions
   - Applied to every output; no output carries hardcoded description text
   - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 16. Empty and degenerate states
+- [x] 16. Empty and degenerate states
   - Empty state naming the active filters when the filtered set is empty
   - Gross-of-fees notice when the dataset had no fee columns
   - Note rendering for every unavailable statistic

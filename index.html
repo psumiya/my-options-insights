@@ -137,6 +137,9 @@
                     <button id="tab-strategies" class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-panel-strategies">
                         Strategies
                     </button>
+                    <button id="tab-research" class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-panel-research">
+                        Research
+                    </button>
                     <button id="tab-data" class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-panel-data">
                         Data
                     </button>
@@ -279,6 +282,11 @@
                 </div>
             </div>
 
+            <!-- Tab Panel: Research -->
+            <div id="tab-panel-research" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-research">
+                <div id="research-panel"></div>
+            </div>
+
             <!-- Tab Panel: Data -->
             <div id="tab-panel-data" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-data">
                 <section class="bg-surface border border-border rounded-lg p-6">
@@ -320,6 +328,11 @@
     <script src="js/csv-data-viewer.js"></script>
     <script src="js/collapsible-section.js"></script>
     <script src="js/advanced-visualization-panel.js"></script>
+
+    <!-- Research Tab -->
+    <script src="js/research-analytics.js"></script>
+    <script src="js/research-scenarios.js"></script>
+    <script src="js/research-panel.js"></script>
     
     <!-- Visualization Components -->
     <script src="js/visualizations/summary-metrics-panel.js"></script>

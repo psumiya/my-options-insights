@@ -54,6 +54,10 @@ class DashboardController {
     });
     this.advancedVizPanel.initialize();
 
+    // Research tab (Requirement 5.1)
+    this.researchPanel = new ResearchPanel('research-panel');
+    this.researchPanel.initialize();
+
     // Register all advanced visualizations (Requirements: 2.3, 2.4)
     // Note: Pass factory functions instead of instances so charts are created
     // only when their tab container is ready
@@ -454,6 +458,16 @@ class DashboardController {
         console.log('✓ Advanced Visualization Panel updated');
       } catch (e) {
         console.error('✗ Advanced Visualization Panel error:', e);
+      }
+    }
+
+    // Update research tab with the same filtered set (Requirement 5.5)
+    if (this.researchPanel) {
+      try {
+        this.researchPanel.update(filteredTrades);
+        console.log('✓ Research Panel updated');
+      } catch (e) {
+        console.error('✗ Research Panel error:', e);
       }
     }
 

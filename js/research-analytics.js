@@ -34,6 +34,20 @@ const ResearchAnalytics = (function () {
     [STRUCTURES.CALL_CREDIT_SPREAD]: 'Call Credit Spread'
   };
 
+  const DTE_CUT_LABELS = {
+    all: 'All DTE',
+    zero: '0DTE only',
+    nonzero: 'DTE > 0'
+  };
+
+  // Why a trade the active filter would otherwise have admitted was dropped
+  const EXCLUSION_LABELS = {
+    unmappedStructure: 'strategy out of scope',
+    structureNotSelected: 'structure not selected',
+    missingDte: 'no expiration data',
+    noWidth: 'no spread width'
+  };
+
   const DTE_BUCKETS = [
     { id: '0DTE', test: dte => dte === 0 },
     { id: '1-7DTE', test: dte => dte >= 1 && dte <= 7 },
@@ -125,6 +139,63 @@ const ResearchAnalytics = (function () {
    */
   function structureLabel(structure) {
     return STRUCTURE_LABELS[structure] || structure;
+  }
+
+  // ===== provenance =====
+
+  /**
+   * Plain-language description of a filter state
+   * Every output's caption is derived from this, so no output can carry
+   * hardcoded text that goes stale when the filter changes.
+   * @param {Object} filter - { underlying, dteCut, structures }
+   * @returns {string} - Description, e.g. "SPX · Iron Condor only · 0DTE only"
+   */
+  function describeFilter(filter) {
+    const options = filter || {};
+    const structures = options.structures && options.structures.length
+      ? options.structures
+      : null;
+
+    const structureText = structures
+      ? (structures.length === 1
+        ? `${structureLabel(structures[0])} only`
+        : structures.map(structureLabel).sort().join(', '))
+      : 'All strategies';
+
+    return [
+      options.underlying || 'All underlyings',
+      structureText,
+      DTE_CUT_LABELS[options.dteCut || 'all'] || DTE_CUT_LABELS.all
+    ].join(' · ');
+  }
+
+  /**
+   * Caption for a single output: what cut it shows, how many trades back it,
+   * and what those numbers leave out
+   * @param {Object} filter - Active filter state
+   * @param {Object} info - { n, excluded, extra }
+   *   excluded: reason key to count, or { reason, count } pairs
+   * @returns {string} - Caption line
+   */
+  function buildCaption(filter, info) {
+    const details = info || {};
+    const parts = [describeFilter(filter)];
+
+    if (typeof details.n === 'number') {
+      parts.push(`${details.n} closed trade${details.n === 1 ? '' : 's'}`);
+    }
+
+    const excluded = details.excluded || {};
+    Object.keys(excluded).forEach(reason => {
+      const count = excluded[reason];
+      if (!count) return;
+      const label = EXCLUSION_LABELS[reason] || reason;
+      parts.push(`${count} excluded (${label})`);
+    });
+
+    if (details.extra) parts.push(details.extra);
+
+    return parts.join(' · ');
   }
 
   // ===== filtering =====
@@ -573,8 +644,12 @@ const ResearchAnalytics = (function () {
   return {
     STRUCTURES,
     STRUCTURE_LABELS,
+    DTE_CUT_LABELS,
+    EXCLUSION_LABELS,
     canonicalStructure,
     structureLabel,
+    describeFilter,
+    buildCaption,
     applyFilter,
     winLossStats,
     dteBucketStats,
