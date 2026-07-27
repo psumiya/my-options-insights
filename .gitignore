@@ -45,3 +45,6 @@ infrastructure/**/*.tfstate
 infrastructure/**/*.tfstate.backup
 infrastructure/**/.terraform/
 infrastructure/**/terraform.tfvars
+
+# Claude Code local settings
+.claude/settings.local.json

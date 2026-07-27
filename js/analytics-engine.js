@@ -17,16 +17,35 @@ class AnalyticsEngine {
     const exitDate = trade.Exit ? this._parseDate(trade.Exit) : null;
 
     // Calculate Days to Expire at Entry (Requirement 2.1)
+    // Uses calendar-date differencing so an afternoon entry on its own
+    // expiration date still reads as 0 DTE
     if (entryDate && expiryDate) {
-      enriched.DaysToExpireAtEntry = this._daysBetween(entryDate, expiryDate);
+      enriched.DaysToExpireAtEntry = this._daysBetweenDates(entryDate, expiryDate);
     } else {
       enriched.DaysToExpireAtEntry = null;
     }
 
     // Calculate P/L (Requirement 2.2)
+    // Net of commissions and fees; both are stored as positive cost magnitudes
+    // and default to zero for brokers whose exports omit them
     const credit = parseFloat(trade.Credit) || 0;
     const debit = parseFloat(trade.Debit) || 0;
-    enriched.ProfitLoss = credit - debit;
+    const commissions = parseFloat(trade.Commissions) || 0;
+    const fees = parseFloat(trade.Fees) || 0;
+    enriched.ProfitLoss = credit - debit - commissions - fees;
+
+    // What the broker counts as realized. Brokers settle leg by leg, so a
+    // half-closed strategy has realized P/L while still being an open position.
+    // Adapters that cannot distinguish the two fall back to the whole trade.
+    if (trade.RealizedPL !== undefined && trade.RealizedPL !== null) {
+      enriched.RealizedPL = trade.RealizedPL;
+      enriched.RealizedGrossPL = trade.RealizedGrossPL !== undefined
+        ? trade.RealizedGrossPL
+        : trade.RealizedPL;
+    } else {
+      enriched.RealizedPL = exitDate ? enriched.ProfitLoss : 0;
+      enriched.RealizedGrossPL = exitDate ? credit - debit : 0;
+    }
 
     // Calculate Premium Percentage (Requirement 2.3)
     if (credit > 0) {
@@ -90,6 +109,23 @@ class AnalyticsEngine {
     const msPerDay = 1000 * 60 * 60 * 24;
     const diffMs = endDate.getTime() - startDate.getTime();
     return Math.round(diffMs / msPerDay);
+  }
+
+  /**
+   * Calculate calendar days between two dates, ignoring time of day
+   * Entry timestamps carry a time component while expirations are midnight,
+   * so differencing raw timestamps rounds same-day trades to 0 or -1 depending
+   * on the hour they were opened. Normalizing both ends first avoids that.
+   * @param {Date} startDate - Start date
+   * @param {Date} endDate - End date
+   * @returns {number} - Number of calendar days between dates
+   * @private
+   */
+  _daysBetweenDates(startDate, endDate) {
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    return Math.round((end.getTime() - start.getTime()) / msPerDay);
   }
 
   /**
@@ -276,8 +312,15 @@ class AnalyticsEngine {
 
     // Group trades by specified dimensions (Requirements 6.2, 7.1, 7.2, 7.3)
     trades.forEach(trade => {
-      // Only include closed trades
-      if (trade.Result === 'Open') return;
+      // Net counts closed positions; gross counts every retired leg, including
+      // legs inside positions that are still open, which is how a broker
+      // statement reports realized P/L
+      const isClosed = trade.Result !== 'Open';
+      const gross = trade.RealizedGrossPL !== undefined
+        ? trade.RealizedGrossPL
+        : (isClosed ? (parseFloat(trade.Credit) || 0) - (parseFloat(trade.Debit) || 0) : 0);
+
+      if (!isClosed && !gross) return;
 
       // Create composite key from dimensions
       const keyParts = dimensions.map(dim => trade[dim] || 'Unknown');
@@ -292,13 +335,23 @@ class AnalyticsEngine {
         breakdownMap.set(key, {
           dimensions: dimensionValues,
           pl: 0,
-          tradeCount: 0
+          tradeCount: 0,
+          plGross: 0,
+          realizedCount: 0
         });
       }
 
       const group = breakdownMap.get(key);
-      group.pl += trade.ProfitLoss;
-      group.tradeCount++;
+
+      if (isClosed) {
+        group.pl += trade.ProfitLoss;
+        group.tradeCount++;
+      }
+
+      if (gross) {
+        group.plGross += gross;
+        group.realizedCount++;
+      }
     });
 
     // Convert to array and sort by P/L descending
@@ -327,6 +380,13 @@ class AnalyticsEngine {
     
     // Calculate total P/L (Requirement 13.4)
     const totalPL = closedTrades.reduce((sum, trade) => sum + trade.ProfitLoss, 0);
+
+    // Realized P/L counts every retired leg, including those inside positions
+    // that are still open, which is how brokers report it
+    const realizedPL = trades.reduce((sum, trade) => sum + (trade.RealizedPL || 0), 0);
+    const openPositions = trades.filter(trade => trade.Result === 'Open').length;
+    const incompleteBasis = trades.filter(trade =>
+      trade._metadata && trade._metadata.incompleteBasis).length;
     
     // Calculate average win (Requirement 13.5)
     const totalWinAmount = wins.reduce((sum, trade) => sum + trade.ProfitLoss, 0);
@@ -336,6 +396,9 @@ class AnalyticsEngine {
       totalTrades,
       winRate,
       totalPL,
+      realizedPL,
+      openPositions,
+      incompleteBasis,
       averageWin
     };
   }

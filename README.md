@@ -59,6 +59,53 @@ See [BROKER_SUPPORT.md](BROKER_SUPPORT.md) for detailed format specifications.
 - **P/L by Strategy** - See which strategies are most profitable
 - **P/L by Symbol & Strategy** - Detailed table breakdown of performance
 
+### Research Tab
+Structural analysis of closed trades: which choices drove the result, and whether
+the pattern survives a small-sample check.
+
+- **Presets** - One click applies a saved cut (underlying, DTE, structures)
+- **Filter bar** - Underlying, days-to-expiration cut, and structure selection;
+  deselect every structure to include all strategies
+- **Calendar** - Net P/L per trading date, cells labelled by structure
+- **Trade by trade** - One bar per closed trade, with net, average and count above
+- **By days to expiration** - Win rate and expectancy split 0DTE / 1-7DTE / >7DTE
+- **Condor vs single-sided** - Iron condors against one-sided credit spreads
+- **By spread width** - Performance and average credit collected per width
+- **Uniform-width counterfactual** - What the same book returns at one width
+- **Streak check** - Whether wins and losses cluster more than chance predicts
+- **Loss concentration** - Share of total losses carried by the largest few
+- **Threshold significance** - Whether a one-sided loss pattern is small-sample noise
+
+Every output states which cut it shows and how many trades back it. Statistics that
+a sample is too small to support say so rather than showing a number.
+
+Adding a cut is an edit to `RESEARCH_PRESETS` in `js/research-scenarios.js`.
+
+## P/L Definition
+
+P/L is **net of commissions and fees** wherever the broker export provides them.
+TastyTrade exports do; Robinhood's `Amount` column is already net; the generic
+format has no fee columns, in which case the Research tab says P/L is gross of fees.
+
+The `P/L by Symbol & Strategy` table on the Strategies tab has a **Net / Gross**
+toggle. Net is what each closed position returned after costs. Gross counts every
+retired leg before costs, which is the measure that matches the P/L column of a
+broker statement, so use it to reconcile.
+
+The headline figure is **Realized P/L**, which counts every retired leg. Brokers
+settle leg by leg, so half of a strangle can be realized while the position is
+still open. This is the figure that ties to a broker statement; individual trades
+stay grouped by strategy, and a strategy is only marked closed once every one of
+its legs is gone.
+
+Two things cannot be reconciled from a transaction export alone, and the app says
+so rather than guessing:
+
+- **Positions opened before the export window.** Only the closing side is known,
+  so their P/L is understated. Re-export covering the opening dates to fix.
+- **Positions spanning a year boundary.** TastyTrade's year-to-date report carries
+  the prior year-end *mark* as cost basis; the app computes P/L from entry to exit.
+
 ## Filters
 
 - **Date Range**: Last 7 days, 30 days, 12 months, Year To Date, All time

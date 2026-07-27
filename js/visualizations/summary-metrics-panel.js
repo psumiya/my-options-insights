@@ -68,10 +68,16 @@ class SummaryMetricsPanel {
       totalTrades = 0,
       winRate = 0,
       totalPL = 0,
+      realizedPL = null,
+      openPositions = 0,
       averageWin = 0
     } = this.metrics;
 
-    const plColorClass = this.getPLColorClass(totalPL);
+    // Realized P/L is the figure that ties to a broker statement: it counts
+    // every retired leg, including legs of positions that are still open.
+    // Adapters that cannot tell the two apart pass no realizedPL and fall back.
+    const headlinePL = realizedPL === null ? totalPL : realizedPL;
+    const plColorClass = this.getPLColorClass(headlinePL);
 
     this.container.innerHTML = `
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -89,8 +95,9 @@ class SummaryMetricsPanel {
 
         <!-- Total P/L Card -->
         <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
-          <div class="text-gray-400 text-sm font-medium mb-2">Total P/L</div>
-          <div class="text-4xl font-bold font-mono ${plColorClass}">${this.formatCurrency(totalPL)}</div>
+          <div class="text-gray-400 text-sm font-medium mb-2">Realized P/L</div>
+          <div class="text-4xl font-bold font-mono ${plColorClass}">${this.formatCurrency(headlinePL)}</div>
+          ${openPositions ? `<div class="text-gray-500 text-xs mt-1">${openPositions} position${openPositions === 1 ? '' : 's'} still open</div>` : ''}
         </div>
 
         <!-- Average Win Card -->

@@ -79,6 +79,34 @@ Simply drag and drop your CSV file from any supported broker. The system will:
 | MarketOrFill | Credit/Debit | "cr" = credit, "db" = debit |
 | - | Volume | Extracted from description |
 
+### Non-Trade Rows
+
+TastyTrade books more than trades in the transaction history, and ignoring the
+rest leaves positions open forever and money on the floor:
+
+| Type | Sub Type | Meaning |
+|------|----------|---------|
+| Receive Deliver | Expiration | Contract expired; closes the position at zero |
+| Receive Deliver | Assignment / Exercise | Contract removed; `Action` is blank and is inferred from the open position |
+| Receive Deliver | Cash Settled Assignment / Exercise | Index settlement; carries the cash and arrives *alongside* an Expiration row for the same contract |
+| Receive Deliver | Buy to Open / Sell to Close (Equity) | Shares delivered by assignment; tracked as their own position |
+
+Positions are matched as **FIFO lots keyed on contract and opening order**. Selling
+the same strike in two orders opens two positions, and one closing row can retire
+lots from several orders, in which case its value and fees are split proportionally.
+
+### Derived Fields
+
+Computed during aggregation, not read from the CSV:
+
+| Internal Field | Derivation |
+|----------------|------------|
+| Commissions, Fees | Summed across all legs, stored as positive cost magnitudes and subtracted from P/L. Zero when the export has no such columns. |
+| OpenCredit | Credit taken in on the opening legs only, so sell-to-close proceeds do not inflate it |
+| Width | Strike difference for a vertical; the wider wing for a four-leg condor; null where no width is meaningful |
+| Expiry | Nearest expiration across the opening legs, flagging calendars and diagonals |
+| DaysToExpireAtEntry | Calendar days from entry to nearest expiration, so a same-day entry reads as 0 regardless of the hour it was opened |
+
 ### Generic → Internal Format
 | Generic Field | Internal Field | Required |
 |--------------|----------------|----------|

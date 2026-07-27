@@ -219,7 +219,10 @@ class HeatmapCalendarChart {
       return {
         date: date,
         pl: d.pl,
-        tradeCount: d.tradeCount
+        tradeCount: d.tradeCount,
+        // Optional short label (e.g. a structure code) shown beside the trade
+        // count. Callers that omit it get the original count-only text.
+        label: d.label || null
       };
     }).sort((a, b) => a.date - b.date);
 
@@ -292,6 +295,7 @@ class HeatmapCalendarChart {
           y: rowIndex * (this.cellSize + this.cellGap),
           pl: data ? data.pl : null,
           tradeCount: data ? data.tradeCount : 0,
+          label: data ? data.label : null,
           hasData: !!data
         };
       });
@@ -383,6 +387,7 @@ class HeatmapCalendarChart {
           y: rowIndex * (this.cellSize + this.cellGap),
           pl: data ? data.pl : null,
           tradeCount: data ? data.tradeCount : 0,
+          label: data ? data.label : null,
           hasData: !!data
         };
       })
@@ -485,7 +490,10 @@ class HeatmapCalendarChart {
         return this._getContrastColor(bgColor);
       })
       .attr('opacity', 0.9)
-      .text(d => `${d.tradeCount} trade${d.tradeCount !== 1 ? 's' : ''}`);
+      .text(d => {
+        const count = `${d.tradeCount} trade${d.tradeCount !== 1 ? 's' : ''}`;
+        return d.label ? `${d.tradeCount} · ${d.label}` : count;
+      });
 
     tradeLabels.exit().remove();
   }
@@ -674,6 +682,9 @@ class HeatmapCalendarChart {
         <div style="color: #9ca3af; font-size: 11px;">
           Trades: <span style="color: #e5e7eb; font-weight: 600;">${data.tradeCount}</span>
         </div>
+        ${data.label ? `<div style="color: #9ca3af; font-size: 11px;">
+          Structure: <span style="color: #e5e7eb; font-weight: 600;">${data.label}</span>
+        </div>` : ''}
       `);
 
     this._positionTooltip(event);
