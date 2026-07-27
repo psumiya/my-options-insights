@@ -59,6 +59,8 @@ class DashboardController {
     this.researchPanel.initialize();
     ResearchOutputs.register(this.researchPanel);
 
+    this.initializePLMeasureToggle();
+
     // Register all advanced visualizations (Requirements: 2.3, 2.4)
     // Note: Pass factory functions instead of instances so charts are created
     // only when their tab container is ready
@@ -506,16 +508,24 @@ class DashboardController {
     // Store original data for sorting (don't pre-sort here)
     this.tableData = [...data];
 
-    // Render rows in original order (already sorted by analytics engine)
-    data.forEach(item => {
+    const gross = this.plMeasure === 'gross';
+    const valueOf = item => (gross ? item.plGross : item.pl);
+    const countOf = item => (gross ? item.realizedCount : item.tradeCount);
+
+    const visible = data
+      .filter(item => countOf(item) > 0)
+      .sort((a, b) => valueOf(b) - valueOf(a));
+
+    visible.forEach(item => {
       const row = document.createElement('tr');
-      const plColor = item.pl >= 0 ? 'text-profit' : 'text-loss';
+      const value = valueOf(item);
+      const plColor = value >= 0 ? 'text-profit' : 'text-loss';
 
       row.innerHTML = `
         <td>${item.dimensions.Symbol || 'Unknown'}</td>
         <td>${item.dimensions.Strategy || 'Unknown'}</td>
-        <td class="font-mono">${item.tradeCount}</td>
-        <td class="font-mono ${plColor}">${this.formatCurrency(item.pl)}</td>
+        <td class="font-mono">${countOf(item)}</td>
+        <td class="font-mono ${plColor}">${this.formatCurrency(value)}</td>
       `;
 
       tbody.appendChild(row);
@@ -523,8 +533,66 @@ class DashboardController {
 
     // Update collapsible section summary with row count (Requirement 1.5)
     if (this.collapsibleSection) {
-      const rowText = data.length === 1 ? 'row' : 'rows';
-      this.collapsibleSection.updateSummary(`${data.length} ${rowText} available`);
+      const rowText = visible.length === 1 ? 'row' : 'rows';
+      this.collapsibleSection.updateSummary(`${visible.length} ${rowText} available`);
+    }
+  }
+
+  /**
+   * Wire the net/gross toggle above the Symbol & Strategy table
+   *
+   * Net is what the position actually returned after costs. Gross matches the
+   * P/L column of a broker statement, which reports commissions and fees
+   * separately, so it is the measure to reconcile against.
+   */
+  initializePLMeasureToggle() {
+    let stored = null;
+    try {
+      stored = localStorage.getItem('pl_measure');
+    } catch (error) {
+      console.warn('Could not read P/L measure preference:', error);
+    }
+
+    this.plMeasure = stored === 'gross' ? 'gross' : 'net';
+
+    // Delegated, because CollapsibleSection rebuilds the section's innerHTML
+    // when it initializes and would drop listeners bound to the buttons here
+    document.addEventListener('click', event => {
+      const button = event.target.closest('[data-pl-measure]');
+      if (!button) return;
+
+      this.plMeasure = button.dataset.plMeasure;
+      try {
+        localStorage.setItem('pl_measure', this.plMeasure);
+      } catch (error) {
+        console.warn('Could not persist P/L measure preference:', error);
+      }
+      this.syncPLMeasureToggle();
+      if (this.tableData) this.updateTable(this.tableData);
+    });
+
+    this.syncPLMeasureToggle();
+  }
+
+  syncPLMeasureToggle() {
+    const gross = this.plMeasure === 'gross';
+
+    document.querySelectorAll('[data-pl-measure]').forEach(button => {
+      const active = button.dataset.plMeasure === this.plMeasure;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-checked', String(active));
+    });
+
+    const column = document.getElementById('pl-measure-column');
+    if (column) column.textContent = gross ? 'P/L (gross)' : 'P/L (net)';
+
+    const caption = document.getElementById('pl-measure-caption');
+    if (caption) {
+      caption.textContent = gross
+        ? 'Gross of commissions and fees, counting every retired leg including legs of positions still open. '
+          + 'This is the measure that matches the P/L column of a broker statement.'
+        : 'Net of commissions and fees, for positions that are fully closed. '
+          + 'This is what each strategy actually returned.';
     }
   }
 

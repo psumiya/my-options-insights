@@ -312,8 +312,15 @@ class AnalyticsEngine {
 
     // Group trades by specified dimensions (Requirements 6.2, 7.1, 7.2, 7.3)
     trades.forEach(trade => {
-      // Only include closed trades
-      if (trade.Result === 'Open') return;
+      // Net counts closed positions; gross counts every retired leg, including
+      // legs inside positions that are still open, which is how a broker
+      // statement reports realized P/L
+      const isClosed = trade.Result !== 'Open';
+      const gross = trade.RealizedGrossPL !== undefined
+        ? trade.RealizedGrossPL
+        : (isClosed ? (parseFloat(trade.Credit) || 0) - (parseFloat(trade.Debit) || 0) : 0);
+
+      if (!isClosed && !gross) return;
 
       // Create composite key from dimensions
       const keyParts = dimensions.map(dim => trade[dim] || 'Unknown');
@@ -328,13 +335,23 @@ class AnalyticsEngine {
         breakdownMap.set(key, {
           dimensions: dimensionValues,
           pl: 0,
-          tradeCount: 0
+          tradeCount: 0,
+          plGross: 0,
+          realizedCount: 0
         });
       }
 
       const group = breakdownMap.get(key);
-      group.pl += trade.ProfitLoss;
-      group.tradeCount++;
+
+      if (isClosed) {
+        group.pl += trade.ProfitLoss;
+        group.tradeCount++;
+      }
+
+      if (gross) {
+        group.plGross += gross;
+        group.realizedCount++;
+      }
     });
 
     // Convert to array and sort by P/L descending

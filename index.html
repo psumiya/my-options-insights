@@ -264,7 +264,14 @@
                 <!-- P/L by Symbol & Strategy Table (Full Width) -->
                 <div id="symbol-strategy-section-container" role="region" aria-label="Profit and Loss by Symbol and Strategy">
                     <div class="bg-surface border border-border rounded-lg p-6">
-                        <h2 class="text-lg font-semibold mb-4">P/L by Symbol & Strategy</h2>
+                        <div class="pl-measure-header">
+                            <h2 class="text-lg font-semibold">P/L by Symbol & Strategy</h2>
+                            <div class="filter-button-group" role="radiogroup" aria-label="P/L measure">
+                                <button class="filter-btn active" data-pl-measure="net" role="radio" aria-checked="true">Net</button>
+                                <button class="filter-btn" data-pl-measure="gross" role="radio" aria-checked="false">Gross</button>
+                            </div>
+                        </div>
+                        <p id="pl-measure-caption" class="pl-measure-caption"></p>
                         <div class="overflow-x-auto">
                             <table id="symbol-strategy-table" class="data-table" role="table">
                                 <thead>
@@ -272,7 +279,7 @@
                                         <th role="columnheader" tabindex="0" class="sortable">Symbol</th>
                                         <th role="columnheader" tabindex="0" class="sortable">Strategy</th>
                                         <th role="columnheader" tabindex="0" class="sortable">Trades</th>
-                                        <th role="columnheader" tabindex="0" class="sortable">P/L</th>
+                                        <th id="pl-measure-column" role="columnheader" tabindex="0" class="sortable">P/L</th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>

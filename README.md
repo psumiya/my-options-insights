@@ -87,6 +87,11 @@ P/L is **net of commissions and fees** wherever the broker export provides them.
 TastyTrade exports do; Robinhood's `Amount` column is already net; the generic
 format has no fee columns, in which case the Research tab says P/L is gross of fees.
 
+The `P/L by Symbol & Strategy` table on the Strategies tab has a **Net / Gross**
+toggle. Net is what each closed position returned after costs. Gross counts every
+retired leg before costs, which is the measure that matches the P/L column of a
+broker statement, so use it to reconcile.
+
 The headline figure is **Realized P/L**, which counts every retired leg. Brokers
 settle leg by leg, so half of a strangle can be realized while the position is
 still open. This is the figure that ties to a broker statement; individual trades

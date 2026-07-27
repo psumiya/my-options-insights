@@ -1526,3 +1526,21 @@ body,
         grid-template-columns: 1fr;
     }
 }
+
+/* P/L measure toggle on the Symbol & Strategy table */
+
+.pl-measure-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.pl-measure-caption {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-bottom: 16px;
+    line-height: 1.5;
+}
