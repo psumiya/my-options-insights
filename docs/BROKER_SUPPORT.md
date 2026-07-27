@@ -79,6 +79,18 @@ Simply drag and drop your CSV file from any supported broker. The system will:
 | MarketOrFill | Credit/Debit | "cr" = credit, "db" = debit |
 | - | Volume | Extracted from description |
 
+### Derived Fields
+
+Computed during aggregation, not read from the CSV:
+
+| Internal Field | Derivation |
+|----------------|------------|
+| Commissions, Fees | Summed across all legs, stored as positive cost magnitudes and subtracted from P/L. Zero when the export has no such columns. |
+| OpenCredit | Credit taken in on the opening legs only, so sell-to-close proceeds do not inflate it |
+| Width | Strike difference for a vertical; the wider wing for a four-leg condor; null where no width is meaningful |
+| Expiry | Nearest expiration across the opening legs, flagging calendars and diagonals |
+| DaysToExpireAtEntry | Calendar days from entry to nearest expiration, so a same-day entry reads as 0 regardless of the hour it was opened |
+
 ### Generic → Internal Format
 | Generic Field | Internal Field | Required |
 |--------------|----------------|----------|

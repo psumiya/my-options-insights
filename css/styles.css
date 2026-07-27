@@ -1389,3 +1389,140 @@ body,
         width: 100%;
     }
 }
+
+/* Research tab outputs */
+
+.research-output-note,
+.research-stat-note {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-top: 12px;
+    line-height: 1.5;
+}
+
+.research-table-scroll {
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+.research-table {
+    min-width: 640px;
+}
+
+/* Row headers are labels, not column captions: the table's uppercase treatment
+   is for the header row only */
+.research-table th[scope="row"] {
+    font-weight: 600;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+    text-align: left;
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: 13px;
+}
+
+.research-table td {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.research-table th[scope="col"]:not(:first-child) {
+    text-align: right;
+}
+
+.research-positive {
+    color: var(--color-profit);
+}
+
+.research-negative {
+    color: var(--color-loss);
+}
+
+.research-tiles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.research-tile {
+    padding: 14px 16px;
+    background-color: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+}
+
+.research-tile-label {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-bottom: 6px;
+}
+
+.research-tile-value {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.research-bar-host {
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+/* Five weekday rows at the calendar's 80px desktop floor, plus its own margins */
+.research-calendar-host {
+    height: 560px;
+    width: 100%;
+    position: relative;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 767px) {
+    .research-calendar-host {
+        height: 440px;
+    }
+}
+
+.research-stat-question {
+    font-size: 13px;
+    color: var(--color-text-primary);
+    margin-bottom: 14px;
+}
+
+.research-stat-rows {
+    display: grid;
+    gap: 2px;
+    max-width: 480px;
+}
+
+.research-stat-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.research-stat-row:last-child {
+    border-bottom: none;
+}
+
+.research-stat-label {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.research-stat-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 767px) {
+    .research-tiles {
+        grid-template-columns: 1fr;
+    }
+}

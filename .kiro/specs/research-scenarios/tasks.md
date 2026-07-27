@@ -112,12 +112,12 @@
 
 ## Phase 4: Outputs
 
-- [ ] 17. Wire the calendar view
+- [x] 17. Wire the calendar view
   - Reuse `HeatmapCalendarChart` against `calendarSeries()` output, no second calendar implementation
   - Label cells by structure, with a mixed indicator for multi-structure dates
   - _Requirements: 8.1, 8.2, 8.3_
 
-- [ ] 18. Build ResearchBarChart
+- [x] 18. Build ResearchBarChart
   - New `js/visualizations/research-bar-chart.js` following the existing chart component pattern
   - One bar per trade from zero, ordered by entry date, green above and red below, value labelled
   - Three-figure summary above the chart from `barSeries()` aggregates
@@ -125,7 +125,7 @@
   - Colors from `js/theme-colors.js`
   - _Requirements: 8.4, 8.5, 8.6, 8.7, 15.1, 15.2_
 
-- [ ] 19. Build StatTable and StatBlock
+- [x] 19. Build StatTable and StatBlock
   - `js/research-outputs.js` with both renderers driven entirely by the analytics return objects
   - StatTable for DTE buckets, condor comparison, width breakdown, counterfactual
   - StatBlock for runs test, loss concentration, significance, rendering notes when unavailable
@@ -133,18 +133,18 @@
   - Counterfactual labelled a linear approximation
   - _Requirements: 9.5, 11.6, 11.7, 12.6, 13.7, 15.5_
 
-- [ ] 20. Section layout and lazy rendering
+- [x] 20. Section layout and lazy rendering
   - Wrap each table and stat output in `CollapsibleSection`
   - Calendar and bar views expanded by default, tables and stats collapsed
   - Defer computation of collapsed outputs until first expansion
   - _Requirements: 15.3, 15.4, 15.6_
 
-- [ ] 21. Theme and responsive verification
+- [x] 21. Theme and responsive verification
   - Verify every output in light and dark themes
   - Verify usability at mobile widths with no horizontal page scroll
   - _Requirements: 15.1, 15.2, 15.5_
 
-- [ ] 22. Documentation
+- [x] 22. Documentation
   - Note the P/L definition change in `README.md` and the fee handling in `docs/BROKER_SUPPORT.md`
   - Document how to add a preset
   - _Requirements: 6.2_

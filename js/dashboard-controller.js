@@ -57,6 +57,7 @@ class DashboardController {
     // Research tab (Requirement 5.1)
     this.researchPanel = new ResearchPanel('research-panel');
     this.researchPanel.initialize();
+    ResearchOutputs.register(this.researchPanel);
 
     // Register all advanced visualizations (Requirements: 2.3, 2.4)
     // Note: Pass factory functions instead of instances so charts are created
