@@ -1,13 +1,18 @@
 #!/bin/bash
-# Deploy Option Insights to the shared sumiya.page site.
+# Deploy Option Insights to a shared site.
 #
-# The app is hosted as a subpath of sumiya.page rather than its own subdomain,
-# to avoid a dedicated Route 53 hosted zone / CloudFront distribution / bucket.
-#
-# Live URL: https://sumiya.page/${S3_PREFIX}/index.html
+# The app is hosted as a subpath of an existing site rather than its own
+# subdomain, to avoid a dedicated Route 53 hosted zone / CloudFront
+# distribution / bucket.
 #
 # Usage:
 #   S3_BUCKET=<bucket> S3_PREFIX=<prefix> CF_DISTRIBUTION_ID=<id> ./deploy.sh
+#
+# SITE_DOMAIN is optional and only decides whether the closing line can name the
+# live URL. It is not derivable from the bucket, which may be named for
+# something other than the domain routed to it, and nothing in the deploy
+# depends on it, so a missing value prints a shorter message rather than
+# failing a deploy that would otherwise have succeeded.
 
 set -e
 set -o pipefail
@@ -22,6 +27,7 @@ done
 BUCKET="${S3_BUCKET}"
 PREFIX="${S3_PREFIX}"
 DISTRIBUTION_ID="${CF_DISTRIBUTION_ID}"
+DOMAIN="${SITE_DOMAIN:-}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -51,4 +57,8 @@ aws cloudfront create-invalidation \
   --query "Invalidation.{Id:Id,Status:Status}" \
   --output table
 
-echo "Done. Live at https://sumiya.page/${PREFIX}/index.html"
+if [ -n "${DOMAIN}" ]; then
+  echo "Done. Live at https://${DOMAIN}/${PREFIX}/index.html"
+else
+  echo "Done. Deployed to s3://${BUCKET}/${PREFIX}/ (set SITE_DOMAIN to print the live URL)"
+fi
