@@ -32,7 +32,6 @@ aws s3 sync "${ROOT_DIR}" "s3://${BUCKET}/${PREFIX}/" \
   --exclude '.*/*' \
   --exclude 'tests/*' \
   --exclude 'docs/*' \
-  --exclude 'infrastructure/*' \
   --exclude '.git/*' \
   --exclude '.kiro/*' \
   --exclude '.vscode/*' \

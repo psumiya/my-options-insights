@@ -27,9 +27,6 @@ build/
 .env
 .env.local
 .env.*.local
-infrastructure/.env
-infrastructure/.env.dev
-infrastructure/.env.production
 
 # Test coverage
 coverage/
@@ -39,12 +36,6 @@ coverage/
 *.tmp
 *.temp
 .cache/
-
-# Infrastructure secrets
-infrastructure/**/*.tfstate
-infrastructure/**/*.tfstate.backup
-infrastructure/**/.terraform/
-infrastructure/**/terraform.tfvars
 
 # Claude Code local settings
 .claude/settings.local.json
