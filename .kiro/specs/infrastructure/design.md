@@ -1,5 +1,11 @@
 # Design Document
 
+> **Retired (2026-07-27).** This spec describes the dedicated-subdomain hosting
+> approach that was abandoned in dbf68d6. The app is now served as a subpath of
+> the shared sumiya.page site via the root `deploy.sh`, and the `infrastructure/`
+> directory this spec produced has been deleted along with its CloudFormation
+> stacks. Kept for historical context only.
+
 ## Overview
 
 This design document describes the architecture and implementation approach for deploying the options trading journal as a static website on AWS infrastructure. The solution uses AWS S3 for storage, CloudFront for content delivery, Route 53 for DNS management, and ACM for SSL/TLS certificates. All infrastructure is defined using CloudFormation templates, and deployment is automated through shell scripts.

@@ -1,5 +1,12 @@
 # Implementation Plan
 
+> **Retired (2026-07-27).** This spec describes the dedicated-subdomain hosting
+> approach that was abandoned in dbf68d6. The app is now served as a subpath of
+> the shared sumiya.page site via the root `deploy.sh`, and the `infrastructure/`
+> directory this spec produced has been deleted along with its CloudFormation
+> stacks. The checked boxes below reflect work that was completed and has since
+> been removed; nothing here is actionable.
+
 - [x] 1. Set up infrastructure directory structure
   - Create `infrastructure/` directory in project root
   - Create subdirectories for templates and scripts

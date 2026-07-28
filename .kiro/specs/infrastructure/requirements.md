@@ -1,5 +1,11 @@
 # Requirements Document
 
+> **Retired (2026-07-27).** This spec describes the dedicated-subdomain hosting
+> approach that was abandoned in dbf68d6. The app is now served as a subpath of
+> the shared sumiya.page site via the root `deploy.sh`, and the `infrastructure/`
+> directory this spec produced has been deleted along with its CloudFormation
+> stacks. Kept for historical context only.
+
 ## Introduction
 
 This document specifies the requirements for deploying the option trading insights as a static website using AWS infrastructure. The deployment system shall provide a secure, scalable, and automated solution for hosting static web content with custom subdomain routing, HTTPS support, and global content delivery.
