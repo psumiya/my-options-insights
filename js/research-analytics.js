@@ -54,6 +54,15 @@ const ResearchAnalytics = (function () {
     { id: '>7DTE', test: dte => dte > 7 }
   ];
 
+  // The three widths worth comparing, with everything else pooled. Ordered, and
+  // the catch-all must stay last: a width lands in the first bucket it matches.
+  const WIDTH_BUCKETS = [
+    { id: '$5-wide', test: width => width === 5 },
+    { id: '$10-wide', test: width => width === 10 },
+    { id: '$20-wide', test: width => width === 20 },
+    { id: 'Other', test: () => true }
+  ];
+
   // ===== numeric helpers =====
 
   function round(value, places) {
@@ -84,19 +93,6 @@ const ResearchAnalytics = (function () {
     const poly = ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t
       - 0.284496736) * t + 0.254829592) * t;
     return sign * (1 - poly * Math.exp(-ax * ax));
-  }
-
-  /**
-   * comb(a, k) / comb(n, k) as a running product, so the ratio stays exact for
-   * sample sizes where the individual binomials would overflow.
-   */
-  function combinationRatio(a, n, k) {
-    if (k > a || k > n) return 0;
-    let ratio = 1;
-    for (let i = 0; i < k; i++) {
-      ratio *= (a - i) / (n - i);
-    }
-    return ratio;
   }
 
   /**
@@ -364,28 +360,37 @@ const ResearchAnalytics = (function () {
   }
 
   /**
-   * Win/loss summary split by spread width, plus average credit taken in
+   * The bucket a spread width belongs to
+   * @param {number} width - Spread width
+   * @returns {string} - Bucket identifier
+   */
+  function widthBucket(width) {
+    return WIDTH_BUCKETS.find(bucket => bucket.test(width)).id;
+  }
+
+  /**
+   * Win/loss summary split by width bucket, plus average credit taken in
+   * Every bucket is always present: a width nobody traded is a finding, not
+   * something to hide.
    * @param {Array} trades - Closed trades
-   * @returns {Object} - { byWidth, excludedNoWidth }
+   * @returns {Object} - { byBucket, excludedNoWidth }
    */
   function widthBreakdown(trades) {
     const usable = withWidth(trades);
-    const widths = [...new Set(usable.map(trade => Number(trade.Width)))].sort((a, b) => a - b);
+    const byBucket = {};
 
-    const byWidth = {};
-
-    widths.forEach(width => {
-      const group = usable.filter(trade => Number(trade.Width) === width);
+    WIDTH_BUCKETS.forEach(bucket => {
+      const group = usable.filter(trade => widthBucket(Number(trade.Width)) === bucket.id);
       const stats = winLossStats(group);
       stats.avgCreditCollected = round(
         mean(group.map(trade => Number(trade.OpenCredit) || 0)),
         2
       );
-      byWidth[width] = stats;
+      byBucket[bucket.id] = stats;
     });
 
     return {
-      byWidth: byWidth,
+      byBucket: byBucket,
       excludedNoWidth: trades.length - usable.length
     };
   }
@@ -503,78 +508,6 @@ const ResearchAnalytics = (function () {
     };
   }
 
-  /**
-   * Hypergeometric check on a two-way split
-   * If every loss landed on one side of a threshold, how likely is that by
-   * chance alone? Only answerable when the losses are entirely one-sided; a
-   * split needs a full Fisher exact test.
-   * @param {Array} trades - Closed trades
-   * @param {Object} options - { column, threshold, comparison: 'ge' | 'lt' }
-   * @returns {Object} - Group sizes, loss counts, and probability or a note
-   */
-  function bucketSignificance(trades, options) {
-    const settings = options || {};
-    const column = settings.column || 'Width';
-    const threshold = settings.threshold;
-    const comparison = settings.comparison === 'lt' ? 'lt' : 'ge';
-
-    const inGroupA = trade => {
-      const value = Number(trade[column]);
-      if (!Number.isFinite(value)) return false;
-      return comparison === 'ge' ? value >= threshold : value < threshold;
-    };
-
-    const groupA = trades.filter(inGroupA);
-    const groupB = trades.filter(trade => !inGroupA(trade));
-    const lossesTotal = trades.filter(trade => pl(trade) < 0).length;
-    const lossesInA = groupA.filter(trade => pl(trade) < 0).length;
-
-    const base = {
-      column: column,
-      threshold: threshold,
-      comparison: comparison,
-      groupAn: groupA.length,
-      groupBn: groupB.length,
-      lossesTotal: lossesTotal,
-      lossesInGroupA: lossesInA
-    };
-
-    if (!trades.length || lossesTotal === 0) {
-      return { ...base, concentratedIn: null, p: null, note: 'no losses to test' };
-    }
-
-    const operator = comparison === 'ge' ? '>=' : '<';
-    const plural = lossesTotal === 1 ? 'loss' : 'losses';
-
-    // Either side being loss-free is a one-sided arrangement worth a p-value.
-    // The reference implementation only checked the threshold group, so an
-    // all-losses-below-threshold pattern went unmeasured.
-    if (lossesInA === lossesTotal) {
-      return {
-        ...base,
-        concentratedIn: 'a',
-        p: round(combinationRatio(groupA.length, trades.length, lossesTotal), 3),
-        note: `all ${lossesTotal} ${plural} fell where ${column} ${operator} ${threshold}`
-      };
-    }
-
-    if (lossesInA === 0) {
-      return {
-        ...base,
-        concentratedIn: 'b',
-        p: round(combinationRatio(groupB.length, trades.length, lossesTotal), 3),
-        note: `all ${lossesTotal} ${plural} fell where ${column} ${operator === '>=' ? '<' : '>='} ${threshold}`
-      };
-    }
-
-    return {
-      ...base,
-      concentratedIn: null,
-      p: null,
-      note: 'losses fall on both sides of the threshold; a full Fisher exact test is needed for a precise p-value'
-    };
-  }
-
   // ===== chart shaping =====
 
   /**
@@ -658,7 +591,6 @@ const ResearchAnalytics = (function () {
     widthCounterfactual,
     runsTest,
     lossConcentration,
-    bucketSignificance,
     calendarSeries,
     barSeries
   };

@@ -24,8 +24,8 @@ const { RESEARCH_PRESETS, RESEARCH_SECTIONS, RESEARCH_SCENARIO_DEFAULTS } = load
 
 // ===== Preset configuration (Requirements 6.2, 6.6) =====
 
-test('the seeded preset list covers all ten cuts', () => {
-  assert.strictEqual(RESEARCH_PRESETS.length, 10);
+test('the seeded preset list covers all nine cuts', () => {
+  assert.strictEqual(RESEARCH_PRESETS.length, 9);
 });
 
 test('preset ids are unique', () => {
@@ -103,12 +103,12 @@ test('section ids are unique', () => {
   assert.strictEqual(new Set(ids).size, ids.length);
 });
 
-test('the calendar and bar views open by default and nothing else does', () => {
+test('the bar and calendar views open by default, in that order, and nothing else does', () => {
   const expanded = RESEARCH_SECTIONS
     .filter(section => section.defaultExpanded)
     .map(section => section.id);
 
-  assert.deepStrictEqual(expanded, ['calendar', 'bar']);
+  assert.deepStrictEqual(expanded, ['bar', 'calendar']);
 });
 
 test('every section has a title', () => {

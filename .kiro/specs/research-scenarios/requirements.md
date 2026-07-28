@@ -16,6 +16,18 @@ Two data-correctness prerequisites are in scope, because every number in this ta
 depends on them: net P/L must include commissions and fees, and DTE-at-entry must be
 computed on calendar dates so that same-day expirations reliably read as 0DTE.
 
+### Amendment (2026-07-27)
+
+Three requirements below have since been superseded by the shipped tab:
+
+- The width-threshold significance output and its preset are withdrawn. A single
+  hand-picked threshold with a hypergeometric p-value over a handful of trades read
+  as a finding without being one. Requirements 13.1 - 13.5 and the tenth preset in
+  6.6 no longer apply; the tab seeds nine presets.
+- The width breakdown groups into $5-wide, $10-wide, $20-wide and Other rather than
+  one row per distinct width value.
+- Trade by trade renders above Calendar. Both still open by default.
+
 ## Glossary
 
 - **Research Tab**: New top-level dashboard tab housing this feature

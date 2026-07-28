@@ -17,8 +17,7 @@
 
 const RESEARCH_SCENARIO_DEFAULTS = {
   counterfactualWidths: [10, 15, 20, 25],
-  concentrationTopN: [3, 5],
-  significance: { column: 'Width', threshold: 20, comparison: 'ge' }
+  concentrationTopN: [3, 5]
 };
 
 const RESEARCH_PRESETS = [
@@ -62,7 +61,7 @@ const RESEARCH_PRESETS = [
   },
   {
     id: 'spx_put_spread_width_breakdown',
-    title: 'SPX put credit spread by width',
+    title: 'SPX put credit spread by width bucket',
     filter: { underlying: 'SPX', dteCut: 'all', structures: ['put_credit_spread'] },
     focus: 'width-breakdown'
   },
@@ -85,31 +84,23 @@ const RESEARCH_PRESETS = [
     filter: { underlying: 'SPX', dteCut: 'all', structures: null },
     focus: 'loss-concentration',
     params: { concentrationTopN: [3, 5] }
-  },
-  {
-    id: 'spx_put_spread_width20_significance',
-    title: 'SPX put credit spread — is the width-20 pattern real',
-    filter: { underlying: 'SPX', dteCut: 'all', structures: ['put_credit_spread'] },
-    focus: 'significance',
-    params: { significance: { column: 'Width', threshold: 20, comparison: 'ge' } }
   }
 ];
 
 /**
- * The output sections, in render order. Calendar and bar views carry the
- * headline picture and open by default; the tables and statistics are opt-in
- * so the tab does not land as a wall of numbers.
+ * The output sections, in render order. The trade-by-trade and calendar views
+ * carry the headline picture and open by default; the tables and statistics are
+ * opt-in so the tab does not land as a wall of numbers.
  */
 const RESEARCH_SECTIONS = [
-  { id: 'calendar', title: 'Calendar', defaultExpanded: true },
   { id: 'bar', title: 'Trade by trade', defaultExpanded: true },
+  { id: 'calendar', title: 'Calendar', defaultExpanded: true },
   { id: 'dte-buckets', title: 'By days to expiration', defaultExpanded: false },
   { id: 'structure-split', title: 'Condor vs single-sided', defaultExpanded: false },
   { id: 'width-breakdown', title: 'By spread width', defaultExpanded: false },
   { id: 'width-counterfactual', title: 'Uniform-width counterfactual', defaultExpanded: false },
   { id: 'runs-test', title: 'Streak check', defaultExpanded: false },
-  { id: 'loss-concentration', title: 'Loss concentration', defaultExpanded: false },
-  { id: 'significance', title: 'Threshold significance', defaultExpanded: false }
+  { id: 'loss-concentration', title: 'Loss concentration', defaultExpanded: false }
 ];
 
 if (typeof window !== 'undefined') {

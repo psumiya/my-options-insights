@@ -249,20 +249,24 @@ const ResearchOutputs = (function () {
 
   function renderWidthBreakdown(container, context) {
     const result = ResearchAnalytics.widthBreakdown(context.trades);
-    const widths = Object.keys(result.byWidth);
+    const buckets = Object.keys(result.byBucket);
 
-    if (!widths.length) {
+    if (!buckets.some(bucket => result.byBucket[bucket].n)) {
       appendEmpty(container, 'No trades in this cut have a spread width.');
       return;
     }
 
     renderStatTable(container, {
-      rowLabel: 'Width',
-      rows: widths.map(width => ({ label: width, stats: result.byWidth[width] })),
+      rowLabel: 'Spread width',
+      rows: buckets.map(bucket => ({ label: bucket, stats: result.byBucket[bucket] })),
       columns: STAT_COLUMNS.concat([
         { key: 'avgCreditCollected', label: 'Avg credit at open', format: 'currency' }
       ])
     });
+
+    appendNote(container,
+      'A bucket with no trades is listed with a zero count rather than hidden. '
+      + 'Any width other than 5, 10 or 20 falls into Other.');
 
     if (result.excludedNoWidth) {
       appendNote(container,
@@ -345,27 +349,6 @@ const ResearchOutputs = (function () {
     });
   }
 
-  function renderSignificance(container, context) {
-    const settings = context.params.significance;
-    const result = ResearchAnalytics.bucketSignificance(context.trades, settings);
-    const operator = result.comparison === 'ge' ? '≥' : '<';
-
-    const rows = [
-      { label: `Trades where ${result.column} ${operator} ${result.threshold}`, value: integer(result.groupAn) },
-      { label: 'Trades in the other group', value: integer(result.groupBn) },
-      { label: 'Losing trades', value: integer(result.lossesTotal) },
-      { label: 'Losses in the threshold group', value: integer(result.lossesInGroupA) },
-      { label: 'p (this split by chance)', value: result.p === null ? '—' : result.p.toFixed(3) }
-    ];
-
-    renderStatBlock(container, {
-      question: `Is the loss pattern either side of ${result.column} ${operator} ${result.threshold} `
-        + 'real, or small-sample noise?',
-      rows: rows,
-      note: result.note
-    });
-  }
-
   /**
    * Attach every renderer to a panel
    * @param {ResearchPanel} panel - The panel to register against
@@ -396,7 +379,6 @@ const ResearchOutputs = (function () {
     panel.registerRenderer('width-counterfactual', renderWidthCounterfactual);
     panel.registerRenderer('runs-test', renderRunsTest);
     panel.registerRenderer('loss-concentration', renderLossConcentration);
-    panel.registerRenderer('significance', renderSignificance);
   }
 
   return {

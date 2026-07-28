@@ -66,15 +66,15 @@ the pattern survives a small-sample check.
 - **Presets** - One click applies a saved cut (underlying, DTE, structures)
 - **Filter bar** - Underlying, days-to-expiration cut, and structure selection;
   deselect every structure to include all strategies
-- **Calendar** - Net P/L per trading date, cells labelled by structure
 - **Trade by trade** - One bar per closed trade, with net, average and count above
+- **Calendar** - Net P/L per trading date, cells labelled by structure
 - **By days to expiration** - Win rate and expectancy split 0DTE / 1-7DTE / >7DTE
 - **Condor vs single-sided** - Iron condors against one-sided credit spreads
-- **By spread width** - Performance and average credit collected per width
+- **By spread width** - Performance and average credit collected per width bucket
+  ($5-wide, $10-wide, $20-wide, other)
 - **Uniform-width counterfactual** - What the same book returns at one width
 - **Streak check** - Whether wins and losses cluster more than chance predicts
 - **Loss concentration** - Share of total losses carried by the largest few
-- **Threshold significance** - Whether a one-sided loss pattern is small-sample noise
 
 Every output states which cut it shows and how many trades back it. Statistics that
 a sample is too small to support say so rather than showing a number.

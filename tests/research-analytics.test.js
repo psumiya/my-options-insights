@@ -331,16 +331,22 @@ test('condorVsSingleSide ignores unmapped strategies', () => {
 
 // ===== widthBreakdown (Requirements 11.1, 11.2, 11.5) =====
 
-test('widthBreakdown groups by width in ascending order', () => {
+test('widthBreakdown reports every bucket in order, empty ones included', () => {
   const result = RA.widthBreakdown(fixture());
 
-  assert.deepStrictEqual(Object.keys(result.byWidth), ['10', '20', '25']);
+  assert.deepStrictEqual(
+    Object.keys(result.byBucket),
+    ['$5-wide', '$10-wide', '$20-wide', 'Other']
+  );
+  assert.strictEqual(result.byBucket['$5-wide'].n, 0, 'the fixture has no 5-wide spread');
+  assert.strictEqual(result.byBucket['$5-wide'].net, 0);
+  assert.strictEqual(result.byBucket['$5-wide'].winRate, null);
   assert.strictEqual(result.excludedNoWidth, 1, 'the Short Put has no width');
 });
 
-test('widthBreakdown width 10 group', () => {
+test('widthBreakdown $10-wide bucket', () => {
   // -300, 80, 60 with open credits 120, 110, 100
-  const group = RA.widthBreakdown(fixture()).byWidth['10'];
+  const group = RA.widthBreakdown(fixture()).byBucket['$10-wide'];
 
   assert.strictEqual(group.n, 3);
   assert.strictEqual(group.net, -160);
@@ -351,9 +357,9 @@ test('widthBreakdown width 10 group', () => {
   assert.strictEqual(group.avgCreditCollected, 110);
 });
 
-test('widthBreakdown width 20 group', () => {
+test('widthBreakdown $20-wide bucket', () => {
   // 100, 150, 90, -700, 40, 0 with open credits 200, 250, 150, 160, 90, 180
-  const group = RA.widthBreakdown(fixture()).byWidth['20'];
+  const group = RA.widthBreakdown(fixture()).byBucket['$20-wide'];
 
   assert.strictEqual(group.n, 6);
   assert.strictEqual(group.net, -320);
@@ -364,11 +370,26 @@ test('widthBreakdown width 20 group', () => {
   assert.strictEqual(group.avgCreditCollected, 171.67, '1030 / 6');
 });
 
-test('widthBreakdown reports nothing when no trade has a width', () => {
+test('widthBreakdown pools an off-bucket width into Other', () => {
+  // the two width-25 condors: -500, 200 with open credits 300, 280
+  const group = RA.widthBreakdown(fixture()).byBucket['Other'];
+
+  assert.strictEqual(group.n, 2);
+  assert.strictEqual(group.net, -300);
+  assert.strictEqual(group.avgWin, 200);
+  assert.strictEqual(group.avgLoss, -500);
+  assert.strictEqual(group.breakevenWinRate, 71.4, '500 / 700');
+  assert.strictEqual(group.expectancy, -150);
+  assert.strictEqual(group.avgCreditCollected, 290);
+});
+
+test('widthBreakdown reports empty buckets when no trade has a width', () => {
   const noWidth = fixture().map(t => ({ ...t, Width: null }));
   const result = RA.widthBreakdown(noWidth);
 
-  assert.deepStrictEqual(result.byWidth, {});
+  Object.keys(result.byBucket).forEach(bucket => {
+    assert.strictEqual(result.byBucket[bucket].n, 0, bucket);
+  });
   assert.strictEqual(result.excludedNoWidth, 12);
 });
 
@@ -491,90 +512,6 @@ test('lossConcentration reports a note when there are no losses', () => {
   assert.match(result.note, /no losing trades/);
 });
 
-// ===== bucketSignificance (Requirements 13.1 - 13.5) =====
-
-test('bucketSignificance computes a probability when losses are one-sided', () => {
-  // Iron condors: widths 20, 20, 25, 25, 20 with the only loss at width 25.
-  // Group A (width >= 25) holds 2 of 5 trades, so comb(2,1)/comb(5,1) = 0.4
-  const condors = fixture().filter(t => t.Strategy === 'Iron Condor');
-  const result = RA.bucketSignificance(condors, {
-    column: 'Width',
-    threshold: 25,
-    comparison: 'ge'
-  });
-
-  assert.strictEqual(result.groupAn, 2);
-  assert.strictEqual(result.groupBn, 3);
-  assert.strictEqual(result.lossesTotal, 1);
-  assert.strictEqual(result.lossesInGroupA, 1);
-  assert.strictEqual(result.p, 0.4);
-  assert.strictEqual(result.concentratedIn, 'a');
-  assert.match(result.note, /all 1 loss fell where Width >= 25/);
-});
-
-test('bucketSignificance measures losses concentrated below the threshold too', () => {
-  // Same condors, threshold flipped: the only loss is now in group B, at
-  // width 25, with group B holding 2 of 5 trades. comb(2,1)/comb(5,1) = 0.4
-  const condors = fixture().filter(t => t.Strategy === 'Iron Condor');
-  const result = RA.bucketSignificance(condors, {
-    column: 'Width',
-    threshold: 25,
-    comparison: 'lt'
-  });
-
-  assert.strictEqual(result.groupAn, 3, 'width < 25');
-  assert.strictEqual(result.lossesInGroupA, 0);
-  assert.strictEqual(result.concentratedIn, 'b');
-  assert.strictEqual(result.p, 0.4);
-  assert.match(result.note, /all 1 loss fell where Width >= 25/);
-});
-
-test('bucketSignificance declines when losses fall on both sides', () => {
-  // Put credit spreads: widths 10, 10, 20, 20 with losses at 10 and 20
-  const spreads = fixture().filter(t => t.Strategy === 'Bull Put Spread');
-  const result = RA.bucketSignificance(spreads, {
-    column: 'Width',
-    threshold: 20,
-    comparison: 'ge'
-  });
-
-  assert.strictEqual(result.lossesTotal, 2);
-  assert.strictEqual(result.lossesInGroupA, 1);
-  assert.strictEqual(result.p, null);
-  assert.match(result.note, /Fisher exact/);
-});
-
-test('bucketSignificance declines when there are no losses', () => {
-  const wins = fixture().filter(t => t.ProfitLoss > 0);
-  const result = RA.bucketSignificance(wins, {
-    column: 'Width',
-    threshold: 20,
-    comparison: 'ge'
-  });
-
-  assert.strictEqual(result.p, null);
-  assert.match(result.note, /no losses to test/);
-});
-
-test('bucketSignificance declines an empty set', () => {
-  const result = RA.bucketSignificance([], { column: 'Width', threshold: 20 });
-
-  assert.strictEqual(result.groupAn, 0);
-  assert.strictEqual(result.groupBn, 0);
-  assert.strictEqual(result.p, null);
-});
-
-test('bucketSignificance treats a null width as outside the threshold group', () => {
-  const result = RA.bucketSignificance(fixture(), {
-    column: 'Width',
-    threshold: 10,
-    comparison: 'ge'
-  });
-
-  assert.strictEqual(result.groupAn, 11, 'every trade but the widthless Short Put');
-  assert.strictEqual(result.groupBn, 1);
-});
-
 // ===== calendarSeries (Requirements 8.1, 8.3, 8.8) =====
 
 test('calendarSeries collapses same-day trades into one cell', () => {
@@ -656,7 +593,6 @@ test('every statistic returns the same result on a repeated call', () => {
     () => RA.widthCounterfactual(trades, [10, 20]),
     () => RA.runsTest(trades),
     () => RA.lossConcentration(trades, [3, 5]),
-    () => RA.bucketSignificance(trades, { column: 'Width', threshold: 20 }),
     () => RA.calendarSeries(trades),
     () => RA.barSeries(trades)
   ];
@@ -675,7 +611,6 @@ test('no statistic mutates or reorders its input', () => {
   RA.widthCounterfactual(trades, [10, 20]);
   RA.runsTest(trades);
   RA.lossConcentration(trades, [3, 5]);
-  RA.bucketSignificance(trades, { column: 'Width', threshold: 20 });
   RA.calendarSeries(trades);
   RA.barSeries(trades);
 
